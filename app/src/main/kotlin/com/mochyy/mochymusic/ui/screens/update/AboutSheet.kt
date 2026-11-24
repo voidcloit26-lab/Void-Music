@@ -249,17 +249,10 @@ fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
     }
 }
 
-private fun PopupSheetState.showCreditsSheet() {
+fun PopupSheetState.showLegalNoticesSheet() {
     val popup = this
     show(buttonBar = { SheetPrimaryButton(text = stringResource(R.string.done), onClick = popup::dismiss) }) {
-        CreditsSheetContent()
-    }
-}
-
-private fun PopupSheetState.showLicenseSheet() {
-    val popup = this
-    show(buttonBar = { SheetPrimaryButton(text = stringResource(R.string.done), onClick = popup::dismiss) }) {
-        LicenseSheetContent()
+        LegalNoticesContent()
     }
 }
 
@@ -400,93 +393,40 @@ private fun ColumnScope.AboutSheetContent(
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
-            SectionHeader("Open-source notices")
-            Spacer(Modifier.height(8.dp))
-            AboutCardButton(
-                text = stringResource(R.string.about_credits),
-                onClick = { popup.showCreditsSheet() },
-            )
-
-            Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_license))
-            Spacer(Modifier.height(8.dp))
-            AboutCardButton(
-                text = stringResource(R.string.about_more_license),
-                onClick = { popup.showLicenseSheet() },
-            )
-
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun ColumnScope.CreditsSheetContent() {
+private fun ColumnScope.LegalNoticesContent() {
     val context = LocalContext.current
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(top = sheetHandleRoom()),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = sheetHandleRoom())
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.about_credits),
-            fontSize = 36.sp,
-            lineHeight = 38.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-1.4).sp,
-        )
-        Spacer(Modifier.height(16.dp))
+        Text("Legal & open-source notices", fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+        Text("VOID Music is a modified open-source project. Original copyrights remain with their respective authors.", fontSize = 13.sp)
+        SectionHeader("Attribution")
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MenuRowSurface)
-                    .padding(vertical = 6.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MenuRowSurface).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             (BaseCredits + MoreCredits).forEach { credit ->
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-                    Text(credit.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(credit.subtitle, fontSize = 12.sp)
-                }
+                Text(credit.name + " — " + credit.subtitle, fontSize = 13.sp, lineHeight = 18.sp)
             }
         }
-        Spacer(Modifier.height(8.dp))
-    }
-}
-
-@Composable
-private fun ColumnScope.LicenseSheetContent() {
-    val context = LocalContext.current
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(top = sheetHandleRoom()),
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.about_license),
-            fontSize = 36.sp,
-            lineHeight = 38.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-1.4).sp,
-        )
-        Spacer(Modifier.height(16.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Licenses.forEach { entry ->
-                LicenseCard(
-                    entry = entry,
-                    onClick = { context.openUrl(entry.url) },
-                )
-            }
+        SectionHeader("Software licenses")
+        Licenses.forEach { entry ->
+            AboutPillRow(text = entry.tag + " · " + entry.title.substringBefore(" · "), onClick = { context.openUrl(entry.url) })
+            Text(entry.subtitle, fontSize = 12.sp)
         }
-        Spacer(Modifier.height(8.dp))
+        Text("Corresponding source and license information: contact the VOID maintainer.", fontSize = 13.sp)
+        AboutPillRow(text = "Contact VOID", onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
+        Spacer(Modifier.height(12.dp))
     }
 }
 
