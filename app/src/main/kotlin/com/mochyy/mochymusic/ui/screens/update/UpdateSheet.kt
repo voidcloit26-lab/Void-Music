@@ -121,15 +121,12 @@ private suspend fun checkUpdate(channel: UpdateChannel, force: Boolean): UpdateS
                 else -> UpdateState.UpToDate
             }
         },
-        onFailure = { UpdateState.Failed(it.message ?: "Couldn't reach GitHub") },
+        onFailure = { UpdateState.Failed(it.message ?: "Automatic updates are unavailable") },
     )
 
 /** shows the app version sheet as a PopupSheet, see docs/popup-sheet.skill.md */
 fun PopupSheetState.showUpdateSheet(updateState: UpdateState, onOpenDevSpace: (Int) -> Unit = {}) {
-    val popup = this
-    show(buttonBar = { SheetPrimaryButton(text = stringResource(R.string.done), onClick = popup::dismiss) }) {
-        UpdateSheetContent(initialState = updateState, popup = popup, onOpenDevSpace = onOpenDevSpace)
-    }
+    showAboutSheet(onOpenDevSpace = onOpenDevSpace)
 }
 
 private fun PopupSheetState.showUpdateDetailSheet(release: GithubRelease) {
