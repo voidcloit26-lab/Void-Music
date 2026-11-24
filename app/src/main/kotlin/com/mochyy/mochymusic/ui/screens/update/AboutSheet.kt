@@ -296,8 +296,8 @@ private fun ColumnScope.AboutSheetContent(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .verticalScroll(scrollState)
-                    .padding(top = room),
+                    .padding(top = room)
+                    .verticalScroll(scrollState),
         ) {
             Spacer(Modifier.height(18.dp))
             Column(
