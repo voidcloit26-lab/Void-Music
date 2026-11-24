@@ -67,7 +67,7 @@ fun DeveloperSpaceScreen(navController: NavController, initialPage: Int = 0) {
     val loading by DevSpaceRepository.loading.collectAsState()
 
     // every open asks GitHub again; the playground page reuses what this fetched
-    LaunchedEffect(Unit) { DevSpaceRepository.refresh(BuildConfig.BUILD_TIME_MILLIS, force = true) }
+    // Repository telemetry is disabled.
 
     val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, DevPeople.lastIndex)) { DevPeople.size }
     val scrollStates = DevPeople.map { rememberScrollState() }
@@ -126,7 +126,7 @@ fun DeveloperSpaceScreen(navController: NavController, initialPage: Int = 0) {
                         alpha = 1f - 0.45f * offset
                     },
                 ) {
-                    PlaygroundCard(stats = stats, settled = ready, onClick = { navController.navigate(DevPlaygroundRoute) })
+                    // Repository statistics are not displayed.
                     Spacer(Modifier.height(maxOf(160.dp, bottomInset + 140.dp)))
                 }
             }
