@@ -97,6 +97,14 @@ check_file(src + "discord/DiscordPresence.kt", "PresencePicture.Logo -> emptyLis
 if (ROOT / ".github/FUNDING.yml").exists():
     errors.append("Upstream funding configuration present")
 
+check_file(src + "ui/screens/settings/integrations/IntegrationsScreen.kt", "context.openDevUrl(OwnerDiscordUrl)", "Owner contact in integrations")
+check_file(src + "ui/screens/settings/ProfileScreen.kt", 'label = "Contact VOID · Owner"', "Owner contact in profile")
+for helper in ("ui/screens/update/UpdateSheet.kt", "ui/screens/settings/devspace/DevStyle.kt"):
+    check_file(src + helper, 'host.endsWith(".github.com")', "Block repository redirects")
+about = (ROOT / (src + "ui/screens/update/AboutSheet.kt")).read_text(encoding="utf-8")
+if "fetchContributors(" in about or re.search(r'https://github\\.com/[^"]+/LICENSE', about):
+    errors.append("Legacy contributor lookup or repository license redirect")
+
 print("VOID Music branding audit")
 print(f"English resource checks: {len(list(english.glob('*.xml')))} files")
 for warning in warnings[:10]:
