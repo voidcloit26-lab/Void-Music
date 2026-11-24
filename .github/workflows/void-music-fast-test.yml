@@ -15,6 +15,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory external dependencies and legacy references
+        run: python3 scripts/void_dependency_audit.py | tee void-dependency-audit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: void-dependency-audit
+          path: void-dependency-audit.txt
+          retention-days: 7
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 40
