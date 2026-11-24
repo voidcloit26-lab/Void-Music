@@ -74,7 +74,10 @@ internal val DevPeople = listOf(
         bio = "VOID Music · Independent Android music app by the VOID team. Join MARS Community for updates and feedback.",
         avatar = R.drawable.ic_mochy_mark,
         takesDonations = false,
-        socials = listOf(DevSocial("MARS Community", DiscordUrl)),
+        socials = listOf(
+            DevSocial("Join MARS Community", DiscordUrl),
+            DevSocial("Contact VOID · Owner", com.mochyy.mochymusic.core.updater.OwnerDiscordUrl),
+        ),
     ),
 )
 
@@ -141,7 +144,7 @@ internal fun DevProfilePage(
                     }
                     if (person.socials.isNotEmpty()) {
                         val context = LocalContext.current
-                        SectionTitle("Socials")
+                        SectionTitle("Community & contact")
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             person.socials.forEach { social ->
                                 DevLinkRow(social.label) { context.openDevUrl(social.url) }
