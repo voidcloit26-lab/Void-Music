@@ -511,7 +511,7 @@ internal fun DiscordButtonCard(
         FieldLabel(stringResource(R.string.discord_field_opens))
         DiscordDropdown(
             selected = button.target,
-            options = PresenceButtonTarget.entries,
+            options = PresenceButtonTarget.entries.filterNot { it == PresenceButtonTarget.MOCHY },
             label = { target ->
                 when (target) {
                     PresenceButtonTarget.YOUTUBE_MUSIC -> context.getString(R.string.discord_target_youtube_music)
