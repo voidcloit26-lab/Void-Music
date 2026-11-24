@@ -128,7 +128,7 @@ fun WelcomeStep(isHiding: Boolean, onNext: () -> Unit) {
         ) {
             Text(
                 text = stringResource(R.string.welcome_to),
-                color = Color(0xFFA7A7A7),
+                color = Color(0xFFB8B4DF),
                 fontSize = (26f * u).sp,
                 lineHeight = (30f * u).sp,
                 fontWeight = FontWeight.SemiBold,
@@ -152,7 +152,7 @@ fun WelcomeStep(isHiding: Boolean, onNext: () -> Unit) {
                 .graphicsLayer { alpha = enter.value * (1f - leave) },
         ) {
             Text(
-                text = stringResource(R.string.welcome_lets_listen),
+                text = "Your music. Your space.",
                 color = Color(0xFFD0D0D0),
                 fontSize = (23f * u).sp,
                 lineHeight = (27f * u).sp,
