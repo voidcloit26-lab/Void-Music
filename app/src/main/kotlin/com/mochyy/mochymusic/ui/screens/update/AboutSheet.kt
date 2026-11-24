@@ -195,7 +195,7 @@ private val Licenses =
         LicenseEntry(
             tag = "GPL-3.0",
             title = "Mochy Music (original project) · GPL-3.0",
-            subtitle = "Free and open source software, source code on GitHub",
+            subtitle = "Free and open-source software · license and corresponding source",
             url = "$GithubRepoUrl/blob/main/LICENSE",
         ),
         LicenseEntry(
@@ -339,11 +339,6 @@ private fun ColumnScope.AboutSheetContent(
     val installed = shortVersion(BuildConfig.VERSION_NAME)
     val scrollState = rememberScrollState()
     val ringScrollRangePx = with(LocalDensity.current) { 180.dp.toPx() }
-    var contributors by remember { mutableStateOf(cachedContributors ?: FallbackContributors) }
-
-    LaunchedEffect(Unit) {
-        contributors = fetchContributors()
-    }
 
     // the page starts under the sheet's handle now, so the ring and the first row sit that much lower
     val room = sheetHandleRoom()
@@ -442,10 +437,7 @@ private fun ColumnScope.AboutSheetContent(
                     text = "Join MARS Community",
                     onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.DiscordUrl) },
                 )
-                AboutPillRow(
-                    text = stringResource(R.string.about_github),
-                    onClick = { context.openUrl(GithubRepoUrl) },
-                )
+
             }
 
             Spacer(Modifier.height(18.dp))
@@ -463,7 +455,7 @@ private fun ColumnScope.AboutSheetContent(
                     PersonRow(
                         name = dev.name,
                         subtitle = null,
-                        avatarUrl = githubAvatarUrl(dev.githubUser),
+                        avatarUrl = "",
                         fallbackRes = dev.fallbackAvatar,
                         showArrow = true,
                         onClick = { onOpenDevSpace(dev.devSpaceIndex) },
@@ -472,30 +464,10 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader("Original open-source projects and contributors")
+            SectionHeader("Open-source notices")
             Spacer(Modifier.height(8.dp))
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MenuRowSurface)
-                        .padding(vertical = 6.dp),
-            ) {
-                BaseCredits.forEach { credit ->
-                    PersonRow(
-                        name = credit.name,
-                        subtitle = credit.subtitle,
-                        avatarUrl = githubAvatarUrl(credit.githubUser),
-                        showArrow = false,
-                        onClick = { context.openUrl(credit.url) },
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            AndMoreRow(
-                avatars = remember { MoreCredits.take(3).map { githubAvatarUrl(it.githubUser) } },
+            AboutCardButton(
+                text = stringResource(R.string.about_credits),
                 onClick = { popup.showCreditsSheet() },
             )
 
@@ -507,27 +479,6 @@ private fun ColumnScope.AboutSheetContent(
                 onClick = { popup.showLicenseSheet() },
             )
 
-            Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_cool_contributors))
-            Spacer(Modifier.height(8.dp))
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MenuRowSurface)
-                        .padding(vertical = 6.dp),
-            ) {
-                contributors.forEach { contributor ->
-                    PersonRow(
-                        name = contributor.login,
-                        subtitle = null,
-                        avatarUrl = contributor.avatarUrl,
-                        showArrow = false,
-                        onClick = { context.openUrl(contributor.profileUrl) },
-                    )
-                }
-            }
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -561,13 +512,10 @@ private fun ColumnScope.CreditsSheetContent() {
                     .padding(vertical = 6.dp),
         ) {
             (BaseCredits + MoreCredits).forEach { credit ->
-                PersonRow(
-                    name = credit.name,
-                    subtitle = credit.subtitle,
-                    avatarUrl = githubAvatarUrl(credit.githubUser),
-                    showArrow = true,
-                    onClick = { context.openUrl(credit.url) },
-                )
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Text(credit.name, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(credit.subtitle, fontSize = 12.sp)
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
