@@ -26,12 +26,6 @@ const val DevPlaygroundRoute = "developer_playground"
 
 @Composable
 fun DevPlaygroundScreen(navController: NavController) {
-    val stats by DevSpaceRepository.current.collectAsState()
-    val loading by DevSpaceRepository.loading.collectAsState()
-    val error by DevSpaceRepository.error.collectAsState()
-    var reload by remember { mutableIntStateOf(0) }
-    LaunchedEffect(reload) { DevSpaceRepository.refresh(BuildConfig.BUILD_TIME_MILLIS, force = reload > 0) }
-    val settled = stats != null || !loading
 
     SubSettingsScaffold(
         title = stringResource(R.string.dev_playground_title),
@@ -39,29 +33,6 @@ fun DevPlaygroundScreen(navController: NavController) {
         onBack = { navController.navigateUp() },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            RepoFiguresCard(
-                title = stringResource(R.string.dev_since_this_build),
-                subtitle = stringResource(R.string.dev_since_build_subtitle),
-                figures =
-                    listOf(
-                        stats?.newIssues to stringResource(R.string.dev_new_reported_issues),
-                        stats?.newResolved to stringResource(R.string.dev_new_resolved_issue),
-                        stats?.commits to stringResource(R.string.dev_commits),
-                        stats?.releases to stringResource(R.string.dev_releases),
-                    ),
-                settled = settled,
-            )
-            RepoFiguresCard(
-                title = stringResource(R.string.dev_in_total),
-                figures =
-                    listOf(
-                        stats?.reportedTotal to stringResource(R.string.dev_reported_issues),
-                        stats?.closedTotal to stringResource(R.string.dev_resolved_issue),
-                    ),
-                settled = settled,
-            )
-            RepoIssuesSection(stats = stats, loading = loading, error = error, onRetry = { reload++ })
-            Spacer(Modifier.height(6.dp))
             CategoryBubble(
                 title = stringResource(R.string.dev_experimental_settings_bubble),
                 iconRes = R.drawable.biotech,
