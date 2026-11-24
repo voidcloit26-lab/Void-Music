@@ -64,54 +64,7 @@ object DevSpaceRepository {
     private const val Repo = "$GithubOwner/$GithubRepo"
 
     /** fetches everything again, unless force is false and the copy is newer than maxAgeMs */
-    suspend fun refresh(sinceMillis: Long, force: Boolean, maxAgeMs: Long = 60_000L) {
-        val known = stats.value
-        if (!force && known != null && System.currentTimeMillis() - known.fetchedAt < maxAgeMs) return
-        // two openers at once (the page and its card): a forced one waits its turn, a lazy one leaves it
-        if (force) mutex.lock() else if (!mutex.tryLock()) return
-        loadingFlag.value = true
-        try {
-            val since = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(sinceMillis))
-            val old = stats.value ?: DevSpaceStats()
-            var failure: String? = null
-            fun <T> guarded(block: () -> T): T? = try {
-                block()
-            } catch (e: RateLimited) {
-                failure = "GitHub's rate limit is reached, try again in a few minutes"
-                null
-            } catch (e: Exception) {
-                failure = failure ?: "Couldn't reach GitHub"
-                null
-            }
-
-            val fresh = withContext(Dispatchers.IO) {
-                coroutineScope {
-                    val open = async { guarded { searchCount("is:open") } }
-                    val closed = async { guarded { searchCount("is:closed") } }
-                    val newIssues = async { guarded { searchCount("created:>=$since") } }
-                    val newResolved = async { guarded { searchCount("is:closed closed:>=$since") } }
-                    val commits = async { guarded { commitsSince(since) } }
-                    val releases = async { guarded { releasesSince(sinceMillis) } }
-                    val issues = async { guarded { latestIssues() } }
-                    DevSpaceStats(
-                        openTotal = open.await() ?: old.openTotal,
-                        closedTotal = closed.await() ?: old.closedTotal,
-                        newIssues = newIssues.await() ?: old.newIssues,
-                        newResolved = newResolved.await() ?: old.newResolved,
-                        commits = commits.await() ?: old.commits,
-                        releases = releases.await() ?: old.releases,
-                        issues = issues.await() ?: old.issues,
-                        fetchedAt = System.currentTimeMillis(),
-                    )
-                }
-            }
-            stats.value = fresh
-            errorFlag.value = failure
-        } finally {
-            loadingFlag.value = false
-            mutex.unlock()
-        }
-    }
+    suspend fun refresh(sinceMillis: Long, force: Boolean, maxAgeMs: Long = 60_000L) = Unit
 
     private class RateLimited : Exception()
 
