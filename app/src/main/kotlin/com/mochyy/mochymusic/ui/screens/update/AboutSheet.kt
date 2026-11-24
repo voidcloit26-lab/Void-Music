@@ -395,7 +395,7 @@ private fun ColumnScope.AboutSheetContent(
                 }
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    text = stringResource(R.string.about_app),
+                    text = "VOID MUSIC",
                     fontSize = 36.sp,
                     lineHeight = 38.sp,
                     fontWeight = FontWeight.Bold,
@@ -403,7 +403,7 @@ private fun ColumnScope.AboutSheetContent(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.about_mochy_music_version, installed),
+                    text = "Version $installed · VOID Edition",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.4).sp,
@@ -421,7 +421,7 @@ private fun ColumnScope.AboutSheetContent(
                         .padding(horizontal = 18.dp, vertical = 16.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.about_app_description),
+                    text = "Your music. Your space. An independent music player maintained by VOID.",
                     fontSize = 15.sp,
                     lineHeight = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -430,18 +430,22 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_actions))
+            SectionHeader("Community & contact")
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AboutPillRow(
                     text = "Join MARS Community",
                     onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.DiscordUrl) },
                 )
+                AboutPillRow(
+                    text = "Contact VOID · Owner",
+                    onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) },
+                )
 
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader("VOID Music developer")
+            SectionHeader("Meet the maintainer")
             Spacer(Modifier.height(8.dp))
             Column(
                 modifier =
@@ -454,7 +458,7 @@ private fun ColumnScope.AboutSheetContent(
                 LeadDevs.forEach { dev ->
                     PersonRow(
                         name = dev.name,
-                        subtitle = null,
+                        subtitle = "Founder / Owner",
                         avatarUrl = "",
                         fallbackRes = dev.fallbackAvatar,
                         showArrow = true,
@@ -576,9 +580,9 @@ private fun AboutPillRow(
             Modifier
                 .pressBounce(interaction, pressedScale = 0.97f)
                 .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MenuRowSurface)
+                .height(52.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xFF252536))
                 .clickable(interactionSource = interaction, indication = RemoteFocus, onClick = onClick)
                 .padding(horizontal = 18.dp),
     ) {
