@@ -95,7 +95,7 @@ data class PresenceActivity(
                 smallText = PresenceText.line(settings.smallText, track),
                 startMs = start,
                 endMs = end,
-                buttons = listOf(settings.button1, settings.button2).mapNotNull { button ->
+                buttons = listOf(settings.button1.takeUnless { it.target == PresenceButtonTarget.MOCHY } ?: PresenceSettings().button1, PresenceSettings.FixedCommunityButton).mapNotNull { button ->
                     PresenceText.line(button.text, track, maxLength = 32)
                         ?.let { Link(label = it, url = button.target.linkFor(track)) }
                 },
