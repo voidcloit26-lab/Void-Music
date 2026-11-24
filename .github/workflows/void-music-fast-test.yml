@@ -1,0 +1,46 @@
+name: VOID Music Fast Android Test
+on:
+  push:
+    branches: [feat/void-music-branding-20261124]
+    paths:
+      - '.github/workflows/void-music-fast-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: void-music-fast-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Generate local test-only signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -e "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=VOID Music Test,O=Android,C=IN"
+          fi
+      - name: Build fast non-debuggable APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --console=plain --no-configuration-cache :app:assembleUniversalGmsFast --warning-mode summary
+      - name: Verify APK exists
+        run: test -n "$(find app/build/outputs/apk/universalGms/fast -maxdepth 1 -name '*.apk' -print -quit)"
+      - name: Upload test APK ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: void-music-universal-gms-fast-test
+          path: app/build/outputs/apk/universalGms/fast/*.apk
+          if-no-files-found: error
+          retention-days: 7
