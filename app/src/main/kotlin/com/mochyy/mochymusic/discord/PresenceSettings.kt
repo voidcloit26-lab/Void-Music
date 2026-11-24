@@ -79,10 +79,10 @@ data class PresenceButton(val text: String, val target: PresenceButtonTarget)
  * an empty one leaves that line off.
  */
 data class PresenceSettings(
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     val kind: PresenceKind = PresenceKind.LISTENING,
     val refreshSeconds: Int = DefaultRefreshSeconds,
-    val name: String = "{artist} on {app}",
+    val name: String = "VOID Music",
     val details: String = "{name}",
     val state: String = "{artist}",
     val largeText: String = "",
@@ -96,7 +96,7 @@ data class PresenceSettings(
     /** frames per second of the rotating artwork's GIF, one of [SpinFpsSteps] */
     val spinFps: Int = DefaultSpinFps,
     /** off the profile the moment the music pauses, rather than staying up frozen for a while */
-    val clearOnPause: Boolean = false,
+    val clearOnPause: Boolean = true,
     // the files picked for "your own picture", empty until one is
     val largeCustomImage: String = "",
     val smallCustomImage: String = "",
@@ -119,8 +119,8 @@ data class PresenceSettings(
         prefs[DiscordSmallImageKey] = smallImage.name
         prefs[DiscordButton1TextKey] = button1.text
         prefs[DiscordButton1TargetKey] = button1.target.name
-        prefs[DiscordButton2TextKey] = button2.text
-        prefs[DiscordButton2TargetKey] = button2.target.name
+        prefs[DiscordButton2TextKey] = FixedCommunityButton.text
+        prefs[DiscordButton2TargetKey] = FixedCommunityButton.target.name
         prefs[DiscordSpinSecondsKey] = spinSeconds
         prefs[DiscordSpinFpsKey] = spinFps
         prefs[DiscordClearOnPauseKey] = clearOnPause
@@ -152,6 +152,8 @@ data class PresenceSettings(
         val CanvasSizeSteps = listOf(96, 128, 160, 192, 240)
         const val DefaultCanvasSize = 128
 
+        val FixedCommunityButton = PresenceButton("Join MARS Community", PresenceButtonTarget.MOCHY)
+
         private val Defaults = PresenceSettings()
 
         fun from(prefs: Preferences) = PresenceSettings(
@@ -169,12 +171,9 @@ data class PresenceSettings(
             smallImage = enumOf(prefs[DiscordSmallImageKey], Defaults.smallImage),
             button1 = PresenceButton(
                 text = prefs[DiscordButton1TextKey] ?: Defaults.button1.text,
-                target = enumOf(prefs[DiscordButton1TargetKey], Defaults.button1.target),
+                target = enumOf(prefs[DiscordButton1TargetKey], Defaults.button1.target).takeUnless { it == PresenceButtonTarget.MOCHY } ?: Defaults.button1.target,
             ),
-            button2 = PresenceButton(
-                text = prefs[DiscordButton2TextKey] ?: Defaults.button2.text,
-                target = enumOf(prefs[DiscordButton2TargetKey], Defaults.button2.target),
-            ),
+            button2 = FixedCommunityButton,
             spinSeconds = (prefs[DiscordSpinSecondsKey] ?: Defaults.spinSeconds).coerceIn(MinSpinSeconds, MaxSpinSeconds),
             spinFps = prefs[DiscordSpinFpsKey]?.takeIf { it in SpinFpsSteps } ?: Defaults.spinFps,
             clearOnPause = prefs[DiscordClearOnPauseKey] ?: Defaults.clearOnPause,
