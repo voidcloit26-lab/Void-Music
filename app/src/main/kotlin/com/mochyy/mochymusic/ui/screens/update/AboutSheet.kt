@@ -196,118 +196,51 @@ private val Licenses =
             tag = "GPL-3.0",
             title = "Mochy Music (original project) · GPL-3.0",
             subtitle = "Free and open-source software · license and corresponding source",
-            url = "$GithubRepoUrl/blob/main/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "ViviMusic · GNU General Public License v3.0",
             subtitle = "by vivizzz007 · base project this app was forked from",
-            url = "https://github.com/vivizzz007/vivi-music/blob/main/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "Metrolist · GNU General Public License v3.0",
             subtitle = "by Mostafa Alagamy · base framework",
-            url = "https://github.com/mostafaalagamy/Metrolist/blob/main/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "SimpMusic · GNU General Public License v3.0",
             subtitle = "by maxrave-dev · lyrics provider integration",
-            url = "https://github.com/maxrave-dev/SimpMusic/blob/dev/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "ArchiveTune · GNU General Public License v3.0",
             subtitle = "by Rukamori · design and architectural inspiration",
-            url = "https://github.com/rukamori/ArchiveTune/blob/main/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "RiMusic · GNU General Public License v3.0",
             subtitle = "by fast4x · InnerTube API wrapper",
-            url = "https://github.com/fast4x/RiMusic/blob/master/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "MIT",
             title = "LRCLIB · MIT License",
             subtitle = "by tranxuanthang · synchronized lyrics database",
-            url = "https://github.com/tranxuanthang/lrclib/blob/main/LICENSE",
+            url = "https://opensource.org/license/mit",
         ),
         LicenseEntry(
             tag = "MIT",
             title = "AutoEq · MIT License",
             subtitle = "by Jaakko Pasanen · headphone correction profiles",
-            url = "https://github.com/jaakkopasanen/AutoEq/blob/master/LICENSE",
+            url = "https://opensource.org/license/mit",
         ),
     )
-
-//  this guy promote the app
-private val ExtraContributors =
-    listOf(
-        ContributorEntry(
-            login = "swtstvn",
-            avatarUrl = githubAvatarUrl("swtstvn"),
-            profileUrl = "https://github.com/swtstvn",
-        ),
-    )
-
-private val FallbackContributors =
-    listOf(
-        ContributorEntry(
-            login = "realidkroo",
-            avatarUrl = githubAvatarUrl("realidkroo"),
-            profileUrl = "https://github.com/realidkroo",
-        ),
-        ContributorEntry(
-            login = "realkeichi",
-            avatarUrl = githubAvatarUrl("realkeichi"),
-            profileUrl = "https://github.com/realkeichi",
-        ),
-    ) + ExtraContributors
-
-// kept in memory for the session so reopening the about sheet never hits github twice
-@Volatile
-private var cachedContributors: List<ContributorEntry>? = null
-
-// github redirects username.png straight to the user's current avatar without counting against the api rate limit
-private fun githubAvatarUrl(githubUser: String): String = "https://github.com/$githubUser.png?size=160"
-
-private suspend fun fetchContributors(): List<ContributorEntry> {
-    cachedContributors?.let { return it }
-    return withContext(Dispatchers.IO) {
-        runCatching {
-            val url = URL("https://api.github.com/repos/$GithubOwner/$GithubRepo/contributors?per_page=30")
-            val conn =
-                (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 8_000
-                    readTimeout = 8_000
-                    setRequestProperty("Accept", "application/vnd.github+json")
-                    setRequestProperty("User-Agent", "mochy-android")
-                }
-            try {
-                val arr = JSONArray(conn.inputStream.bufferedReader().use { it.readText() })
-                buildList {
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.getJSONObject(i)
-                        val type = obj.optString("type", "User")
-                        if (type.equals("Bot", ignoreCase = true)) continue
-                        val login = obj.optString("login").takeIf { it.isNotBlank() } ?: continue
-                        if (login.endsWith("[bot]", ignoreCase = true)) continue
-                        val avatar = obj.optString("avatar_url").ifBlank { githubAvatarUrl(login) }
-                        val html = obj.optString("html_url").ifBlank { "https://github.com/$login" }
-                        add(ContributorEntry(login = login, avatarUrl = avatar, profileUrl = html))
-                    }
-                }.ifEmpty { FallbackContributors }
-                    .plus(ExtraContributors)
-                    .distinctBy { it.login.lowercase() }
-                    .also { cachedContributors = it }
-            } finally {
-                conn.disconnect()
-            }
-        }.getOrDefault(FallbackContributors)
-    }
-}
 
 fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
     val popup = this
