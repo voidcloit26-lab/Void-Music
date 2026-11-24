@@ -73,6 +73,31 @@ class AccessTests(unittest.TestCase):
         with self.assertRaises(AccessDenied):
             self.store.redeem(code, account, device)
 
+    def test_owner_cancel_by_identifier_and_list(self):
+        code = self.store.generate(3)
+        rows = self.store.list_invitations()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["remaining"], 3)
+        self.assertNotIn(code, str(rows))
+        self.assertTrue(self.store.cancel_id(rows[0]["id"]))
+        self.assertEqual(self.store.list_invitations(), [])
+        with self.assertRaises(AccessDenied):
+            self.store.redeem(code, *self.identity(1))
+
+    def test_owner_transfer_preserves_lifetime(self):
+        code = self.store.generate()
+        account, device = self.identity(1)
+        self.store.redeem(code, account, device)
+        new_device = self.identity(2)[1]
+        before = self.store.list_activations()[0]["activated_at"]
+        self.assertTrue(self.store.transfer(account, device, new_device))
+        self.assertFalse(self.store.is_active(account, device))
+        self.assertTrue(self.store.is_active(account, new_device))
+        self.assertEqual(self.store.list_activations()[0]["activated_at"], before)
+        self.assertFalse(self.store.transfer(account, device, self.identity(3)[1]))
+        self.assertTrue(self.store.revoke(account))
+        self.assertFalse(self.store.transfer(account, new_device, self.identity(3)[1]))
+
     def test_invalid_limit_and_hashed_storage(self):
         with self.assertRaises(ValueError):
             self.store.generate(0)
