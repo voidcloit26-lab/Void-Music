@@ -69,7 +69,7 @@ enum class PresenceButtonTarget(val label: String, @DrawableRes val icon: Int) {
     SPOTIFY("Spotify", R.drawable.provider_spotify),
     APPLE_MUSIC("Apple Music", R.drawable.provider_apple_music),
     TIDAL("Tidal", R.drawable.provider_tidal),
-    MOCHY("VOID Music on GitHub", R.drawable.github),
+    MOCHY("MARS Community", R.drawable.link),
 }
 
 data class PresenceButton(val text: String, val target: PresenceButtonTarget)
@@ -90,7 +90,7 @@ data class PresenceSettings(
     val largeImage: PresenceImage = PresenceImage.ARTWORK,
     val smallImage: PresenceImage = PresenceImage.PLAYBACK_STATUS,
     val button1: PresenceButton = PresenceButton("See on YouTube Music", PresenceButtonTarget.YOUTUBE_MUSIC),
-    val button2: PresenceButton = PresenceButton("Open VOID Music", PresenceButtonTarget.MOCHY),
+    val button2: PresenceButton = PresenceButton("Join MARS Community", PresenceButtonTarget.MOCHY),
     /** how long one full turn of the rotating artwork takes */
     val spinSeconds: Int = DefaultSpinSeconds,
     /** frames per second of the rotating artwork's GIF, one of [SpinFpsSteps] */
