@@ -127,6 +127,9 @@ extensions.configure<ApplicationExtension> {
         // The Discord app Mochy signs in through (Developer Portal → your app → Application ID).
         // Discord sends the login back to discord-<id>:/authorize/callback, so the manifest needs it too.
         // Without one, the Discord page says so instead of opening a login that can't come back.
+        // Public identifier for the supported native Rich Presence integration.
+        // Keep the legacy gateway configuration separate until its replacement is verified.
+        buildConfigField("String", "VOID_DISCORD_APPLICATION_ID", "\"1553388915300245594\"")
         val discordClientId = localProperties.getProperty("DISCORD_CLIENT_ID")
             ?: System.getenv("DISCORD_CLIENT_ID") ?: ""
         buildConfigField("String", "DISCORD_CLIENT_ID", "\"$discordClientId\"")
