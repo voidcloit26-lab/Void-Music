@@ -22,6 +22,7 @@ const val InstagramUrl = ""
 const val ThreadsUrl = ""
 // dev spaces hides the discord row while this is blank
 const val DiscordUrl = "https://discord.gg/marscm"
+const val OwnerDiscordUrl = "https://discord.com/users/1472442073108971575"
 
 private const val ReleasesApi =
     "https://api.github.com/repos/$GithubOwner/$GithubRepo/releases?per_page=20"
