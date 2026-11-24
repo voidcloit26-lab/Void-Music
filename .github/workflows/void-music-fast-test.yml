@@ -1,5 +1,5 @@
 name: VOID Music Fast Android Test
-# This workflow can be re-run manually on the current development branch.
+# Build the updated legal notices and About layout; can also be run manually.
 on:
   push:
     branches: [feat/void-music-branding-20261124]
