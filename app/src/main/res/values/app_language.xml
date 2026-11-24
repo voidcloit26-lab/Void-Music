@@ -27,7 +27,7 @@
     <string name="settings_lyrics_order_override">Override lyrics sorting</string>
     <string name="settings_lyrics_order_override_desc">Lyrics with the most features win, like duets and word timing</string>
     <string name="settings_lyrics_order_override_on">Using your order, %1$s first</string>
-    <string name="settings_lyrics_order_override_detail">Mochy looks for lyrics in the song\'s own language, then picks the ones with the most features: duets first, then word-by-word timing, then backing vocals. Turn this on to use your own provider order instead. Lyrics in the wrong language or without timing still lose. Songs that already have lyrics keep them until you refetch.</string>
+    <string name="settings_lyrics_order_override_detail">VOID Music looks for lyrics in the song\'s own language, then picks the ones with the most features: duets first, then word-by-word timing, then backing vocals. Turn this on to use your own provider order instead. Lyrics in the wrong language or without timing still lose. Songs that already have lyrics keep them until you refetch.</string>
     <string name="lyrics_sort_title">Sort provider</string>
     <string name="lyrics_sort_done">done</string>
     <string name="settings_dont_skip_failure">Don\'t skip on failure</string>
@@ -37,7 +37,7 @@
     <string name="settings_seconds_short">%1$d s</string>
     <string name="settings_youtube_plays">Count plays on YouTube</string>
     <string name="settings_youtube_plays_desc">Songs you listen to count as plays on YouTube</string>
-    <string name="settings_youtube_plays_detail">Once a song has played as long as it takes to land in your history, Mochy tells YouTube, the same way the YouTube Music app does. When you\'re signed in, it shows up in your YouTube history too. Skipped songs, local files and anything played offline are never sent</string>
+    <string name="settings_youtube_plays_detail">Once a song has played as long as it takes to land in your history, VOID Music tells YouTube, the same way the YouTube Music app does. When you\'re signed in, it shows up in your YouTube history too. Skipped songs, local files and anything played offline are never sent</string>
     <string name="settings_playback_category">Playback</string>
     <string name="settings_customisation_category">Customisation</string>
     <string name="settings_audio_lab_category">Audio Lab</string>
