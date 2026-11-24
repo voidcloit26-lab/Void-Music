@@ -311,11 +311,7 @@ private fun ColumnScope.UpdateSheetContent(
                     label = stringResource(R.string.about_app),
                     onClick = { popup.showAboutSheet(onOpenDevSpace = onOpenDevSpace) },
                 )
-                ActionRow(
-                    icon = R.drawable.favorite,
-                    label = stringResource(R.string.update_help_us),
-                    onClick = { popup.showSupportSheet() },
-                )
+
             }
             Spacer(Modifier.height(6.dp))
         }
