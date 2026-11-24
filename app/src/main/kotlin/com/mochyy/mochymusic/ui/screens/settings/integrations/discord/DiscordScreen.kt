@@ -350,7 +350,11 @@ private fun CustomizeSection(
     DiscordSectionTitle(stringResource(R.string.discord_section_buttons))
     DiscordButtonCard(stringResource(R.string.discord_first_button), settings.button1) { button -> edit { copy(button1 = button) } }
     Spacer(gap)
-    DiscordButtonCard(stringResource(R.string.discord_second_button), settings.button2) { button -> edit { copy(button2 = button) } }
+    DiscordCard {
+        DiscordCardTitle("Community button · fixed")
+        Text("Join MARS Community", color = DiscordColors.Secondary, fontSize = 14.sp)
+        Text("discord.gg/marscm", color = DiscordColors.Secondary, fontSize = 12.sp)
+    }
     Text(
         text = stringResource(R.string.discord_buttons_note),
         color = DiscordColors.Secondary,
