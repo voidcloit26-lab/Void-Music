@@ -34,6 +34,10 @@ for path in sorted(english.glob("*.xml")):
     contents = path.read_text(encoding="utf-8")
     for match in text_resource.finditer(contents):
         value = match.group(1)
+        # Styles and resource aliases are implementation identifiers, not app-facing text.
+        # In particular @style/Theme.mochy must not be treated as visible branding.
+        if value.strip().startswith("@"):
+            continue
         if not brand.search(value):
             continue
         line = contents.count("\n", 0, match.start()) + 1
