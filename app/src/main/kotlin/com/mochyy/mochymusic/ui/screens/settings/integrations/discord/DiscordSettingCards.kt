@@ -518,7 +518,7 @@ internal fun DiscordButtonCard(
                     PresenceButtonTarget.SPOTIFY -> context.getString(R.string.discord_target_spotify)
                     PresenceButtonTarget.APPLE_MUSIC -> context.getString(R.string.discord_target_apple_music)
                     PresenceButtonTarget.TIDAL -> context.getString(R.string.discord_target_tidal)
-                    PresenceButtonTarget.MOCHY -> context.getString(R.string.discord_target_mochy)
+                    PresenceButtonTarget.MOCHY -> "MARS Community"
                 }
             },
             onSelect = { onChange(button.copy(target = it)) },
