@@ -377,14 +377,14 @@ Caso não tenha problemas, recomendamos manter esta opção desativada.</string>
     <string name="scrobble_account">Conta</string>
     <string name="scrobble_sign_in_title">Entrar no %1$s</string>
     <string name="scrobble_sign_in_desc">Mantenha seu histórico de reprodução, estatísticas e recomendações nesse serviço</string>
-    <string name="scrobble_not_set_up">Não configurado nesta versão do Mochy</string>
+    <string name="scrobble_not_set_up">Não configurado nesta versão do VOID Music</string>
     <string name="scrobble_to">Registrar reproduções em %1$s</string>
     <string name="scrobble_signed_in_as">Conectado como %1$s</string>
     <string name="scrobble_paused_signed_in_as">Pausado. Conectado como %1$s</string>
     <string name="scrobble_open_profile">Abrir seu perfil</string>
     <string name="scrobble_open_profile_desc">Suas reproduções registradas e estatísticas em %1$s</string>
     <string name="scrobble_sign_out">Desconectar</string>
-    <string name="scrobble_sign_out_desc">O Mochy deixará de registrar suas reproduções no %1$s</string>
+    <string name="scrobble_sign_out_desc">O VOID Music deixará de registrar suas reproduções no %1$s</string>
     <string name="scrobble_while_listening">Durante a reprodução</string>
     <string name="scrobble_now_playing">Reproduzindo agora</string>
     <string name="scrobble_now_playing_desc">Mostrar no seu perfil a música que está tocando no momento</string>
@@ -396,10 +396,10 @@ Caso não tenha problemas, recomendamos manter esta opção desativada.</string>
     </plurals>
     <string name="scrobble_plays_waiting_desc">As reproduções são enviadas automaticamente quando você volta a ficar on-line. Toque para enviá-las agora.</string>
     <string name="scrobble_all_sent">Tudo enviado</string>
-    <string name="scrobble_send_later">Ainda não foi possível enviar. O Mochy continuará tentando sempre que você estiver on-line.</string>
+    <string name="scrobble_send_later">Ainda não foi possível enviar. O VOID Music continuará tentando sempre que você estiver on-line.</string>
     <string name="scrobble_signed_in">Conectado ao %1$s como %2$s. A partir de agora, as músicas que você reproduzir serão registradas.</string>
-    <string name="scrobble_signed_out">O %1$s desconectou o Mochy. Entre novamente em Configurações → Integrações para continuar registrando suas reproduções.</string>
-    <string name="scrobble_sign_in_body">Use seu nome de usuário e senha do %1$s. O Mochy armazena apenas a chave de acesso que o %1$s retorna, nunca sua senha.</string>
+    <string name="scrobble_signed_out">O %1$s desconectou o VOID Music. Entre novamente em Configurações → Integrações para continuar registrando suas reproduções.</string>
+    <string name="scrobble_sign_in_body">Use seu nome de usuário e senha do %1$s. O VOID Music armazena apenas a chave de acesso que o %1$s retorna, nunca sua senha.</string>
     <string name="scrobble_username_hint">Seu nome de usuário do %1$s</string>
     <string name="scrobble_password_hint">Sua senha do %1$s</string>
     <string name="scrobble_sign_in_button">Entrar</string>
@@ -414,7 +414,7 @@ Caso não tenha problemas, recomendamos manter esta opção desativada.</string>
     <string name="enable_scrobbling">Ativar registro de reproduções</string>
     <string name="lastfm_now_playing">Enviar música atual</string>
     <string name="last_fm_send_likes">Enviar curtidas/descurtidas</string>
-    <string name="last_fm_send_likes_description">Curtir ou descurtir músicas no Last.fm quando elas forem curtidas ou descurtidas no Mochy</string>
+    <string name="last_fm_send_likes_description">Curtir ou descurtir músicas no Last.fm quando elas forem curtidas ou descurtidas no VOID Music</string>
     <string name="logging_in">Conectando…</string>
 
     <string name="scrobbling_configuration">Configuração do registro de reproduções</string>
@@ -455,7 +455,7 @@ Caso não tenha problemas, recomendamos manter esta opção desativada.</string>
     <string name="karaoke">Karaokê</string>
     <string name="apple_music_style">Apple Music</string>
     <string name="apple_music_style_letter">Apple Music V2 (letra por letra)</string>
-    <string name="mochy_1">mochy (Fluido)</string>
+    <string name="mochy_1">VOID Music (Fluido)</string>
     <string name="apple_music_lyrics_blur">Desfoque das letras no estilo Apple Music</string>
     <string name="apple_music_lyrics_blur_desc">Aplicar desfoque às linhas de letras inativas para criar um efeito de foco premium</string>
     <string name="lyrics_v2_fluid">Letras V2 (Fluido)</string>
@@ -487,14 +487,14 @@ do ano</string>
     <string name="wrapped_total_artists_subtitle">artistas diferentes</string>
     <string name="wrapped_total_songs_title">Você ouviu</string>
     <string name="wrapped_total_songs_subtitle">músicas diferentes</string>
-    <string name="wrapped_intro_title">mochy</string>
+    <string name="wrapped_intro_title">VOID Music</string>
     <string name="wrapped_intro_subtitle">chegou a hora de ver o que você andou ouvindo</string>
     <string name="wrapped_intro_button">Vamos lá!</string>
-    <string name="wrapped_end_thanks">Obrigado por ouvir com o Mochy!</string>
+    <string name="wrapped_end_thanks">Obrigado por ouvir com o VOID Music!</string>
     <string name="wrapped_end_create_playlist">Criar sua playlist Retrospectiva</string>
     <string name="wrapped_end_creating_playlist">Criando…</string>
     <string name="wrapped_end_playlist_saved">Playlist salva</string>
-    <string name="wrapped_logo_content_description">Logotipo do Mochy</string>
+    <string name="wrapped_logo_content_description">Logotipo do VOID Music</string>
     <string name="wrapped_year">2025</string>
     <string name="wrapped_ready_title">SUA RETROSPECTIVA ESTÁ PRONTA!</string>
     <string name="wrapped_ready_subtitle">Veja agora o que você mais curtiu neste ano.</string>
@@ -528,7 +528,7 @@ do ano</string>
     <string name="error_eq_apply_failed">Falha ao aplicar o perfil do equalizador: %1$s</string>
 
     <!-- mochyEqualizer Strings -->
-    <string name="mochy_equalizer">mochyEqualizer</string>
+    <string name="mochy_equalizer">VOID Equalizer</string>
     <string name="mochy_equalizer_desc">Ajuste acústico e efeitos em nível profissional</string>
     <string name="eq_simple">Simples</string>
     <string name="eq_advanced">Avançado</string>
@@ -536,7 +536,7 @@ do ano</string>
     <string name="eq_label_mid">Médios</string>
     <string name="eq_label_treble">Agudos</string>
     <string name="eq_preset_flat">Plano</string>
-    <string name="eq_preset_mochy_signature">Assinatura Mochy</string>
+    <string name="eq_preset_mochy_signature">Assinatura VOID Music</string>
     <string name="eq_preset_acoustic">Acústico</string>
     <string name="eq_preset_spatial">Palco 3D</string>
     <string name="eq_preset_bass_boost">Reforço de graves</string>
@@ -553,9 +553,9 @@ do ano</string>
     <string name="eq_preset_dirac_music">Dirac Music</string>
     <string name="eq_preset_dirac_movie">Dirac Movie</string>
     <string name="eq_preset_dirac_game">Dirac Game</string>
-    <string name="eq_enable_title">mochyEqualizer</string>
+    <string name="eq_enable_title">VOID Equalizer</string>
     <string name="eq_enable_summary">Ativar/desativar processamento de áudio profissional</string>
-    <string name="eq_label_mochy">Assinatura Mochy</string>
+    <string name="eq_label_mochy">Assinatura VOID Music</string>
     <string name="eq_label_dolby">Dolby Atmos</string>
     <string name="eq_label_dirac">Dirac Audio</string>
     <string name="eq_reset">Redefinir</string>
@@ -573,9 +573,9 @@ do ano</string>
     <string name="plays">reproduções</string>
     <string name="casting_to">Transmitindo para %s</string>
     <string name="progress_percent">Progresso %s%%</string>
-    <string name="listening_to_mochy">Ouvindo no Mochy</string>
+    <string name="listening_to_mochy">Ouvindo no VOID Music</string>
     <string name="listen_on_youtube_music">Ouvir no YouTube Music</string>
-    <string name="visit_mochy">Visitar o Mochy</string>
+    <string name="visit_mochy">Visitar o VOID Music</string>
     <string name="open">Abrir</string>
     <string name="failed_to_create_image">Falha ao criar imagem: %s</string>
     <string name="copied_title">Título copiado</string>
@@ -592,13 +592,13 @@ do ano</string>
     <!-- Widget strings -->
     <string name="album_art">Capa do álbum</string>
     <string name="no_song_playing">Nenhuma música em reprodução</string>
-    <string name="tap_to_open">Toque para abrir o Mochy</string>
+    <string name="tap_to_open">Toque para abrir o VOID Music</string>
     <string name="previous">Anterior</string>
     <string name="play_pause">Reproduzir/Pausar</string>
     <string name="next">Próxima</string>
     <string name="like">Curtir</string>
     <string name="not_playing">Nenhuma música em reprodução</string>
-    <string name="tap_to_play">Toque para abrir o Mochy</string>
+    <string name="tap_to_play">Toque para abrir o VOID Music</string>
     <string name="widget_description">Widget de música com controles de reprodução</string>
     <string name="queue_widget_description">Reprodutor de música com prévia da fila</string>
     <string name="turntable_widget_description">Widget de música circular com controles de reprodução e curtida</string>
@@ -757,7 +757,7 @@ do ano</string>
     <string name="crash_share_logs">Compartilhar registros</string>
     <string name="copy_logs">Copiar registros</string>
     <string name="crash_share_title">Compartilhar relatório de falha</string>
-    <string name="crash_report_subject">Relatório de falha do Mochy</string>
+    <string name="crash_report_subject">Relatório de falha do VOID Music</string>
     <string name="crash_close">Fechar</string>
     <string name="crash_no_log">Nenhum registro de falha disponível</string>
 
@@ -809,7 +809,7 @@ do ano</string>
     <string name="delete_from_history">Excluir do histórico</string>
     <string name="re_listen">Ouvir novamente</string>
     <string name="hold_to_recognize">Mantenha pressionado o ícone de pesquisa para reconhecer uma música</string>
-    <string name="play_on_app">Reproduzir no Mochy</string>
+    <string name="play_on_app">Reproduzir no VOID Music</string>
     <string name="recognized_track">Faixa reconhecida</string>
 
     <!-- CSV Import Strings -->
@@ -848,14 +848,14 @@ do ano</string>
     <string name="discord_clear_on_pause">Limpar status ao pausar</string>
     <string name="discord_clear_on_pause_desc">Remove a música do seu perfil assim que você pausa e a exibe novamente quando retoma a reprodução.</string>
     <string name="discord_login_note">Abre a própria página de login do Discord no navegador. Sua senha permanece com o Discord.</string>
-    <string name="discord_permissions_note">A página do Discord também lista seus amigos e convites, pois essas permissões vêm agrupadas com o compartilhamento de status. O Mochy lê apenas seu nome e sua foto e mostra o que você está ouvindo.</string>
+    <string name="discord_permissions_note">A página do Discord também lista seus amigos e convites, pois essas permissões vêm agrupadas com o compartilhamento de status. O VOID Music lê apenas seu nome e sua foto e mostra o que você está ouvindo.</string>
     <string name="discord_button_text_variables">Variáveis: {song_name}, {artist_name}, {album_name}</string>
     <string name="discord_rpc_preview">Prévia da Presença Avançada</string>
     <string name="discord_presence">Presença</string>
     <string name="discord_connect_description">Entre com o Discord para compartilhar o que você está ouvindo</string>
-    <string name="discord_playing_mochy">Jogando Mochy</string>
-    <string name="discord_watching_mochy">Assistindo ao Mochy</string>
-    <string name="discord_competing_mochy">Competindo no Mochy</string>
+    <string name="discord_playing_mochy">Jogando VOID Music</string>
+    <string name="discord_watching_mochy">Assistindo ao VOID Music</string>
+    <string name="discord_competing_mochy">Competindo no VOID Music</string>
     <string name="discord_activity_name">Nome da atividade</string>
     <string name="discord_activity_name_description">Nome personalizado para a atividade (deixe vazio para usar o padrão)</string>
     <string name="discord_advanced_mode">Modo avançado</string>
@@ -946,7 +946,7 @@ acesso rápido</string>
 
     <string name="perm_required">Obrigatória</string>
     <string name="perm_permissions">Permissões</string>
-    <string name="perm_intro_text">Estas permissões são necessárias para o funcionamento correto do Mochy. Conceda-as para continuar.</string>
+    <string name="perm_intro_text">Estas permissões são necessárias para o funcionamento correto do VOID Music. Conceda-as para continuar.</string>
 
     <string name="perm_notif_title">Notificações</string>
     <string name="perm_notif_desc">Saiba imediatamente quando uma música estiver tocando e controle a reprodução pela barra de notificações.</string>
@@ -956,7 +956,7 @@ acesso rápido</string>
 
     <string name="feat_discover">Descobrir</string>
     <string name="feat_features">Recursos</string>
-    <string name="feat_intro">Explore tudo o que o Mochy oferece para sua experiência musical.</string>
+    <string name="feat_intro">Explore tudo o que o VOID Music oferece para sua experiência musical.</string>
 
     <string name="feat_lyrics_title">Letras inteligentes</string>
     <string name="feat_lyrics_desc">Aproveite letras sincronizadas palavra por palavra para milhões de músicas.</string>
@@ -980,7 +980,7 @@ acesso rápido</string>
     <string name="welcome_update_status">Atualizado</string>
     <string name="welcome_update_intro">Verificando se você tem os recursos mais recentes e as melhorias de segurança.</string>
     <string name="welcome_checking_updates">Verificando atualizações…</string>
-    <string name="welcome_up_to_date">O Mochy está atualizado!</string>
+    <string name="welcome_up_to_date">O VOID Music está atualizado!</string>
     <string name="welcome_update_available">Nova versão disponível: %s</string>
     <string name="welcome_everything_ready">Tudo está atualizado</string>
     <string name="commits_title">Commits</string>
@@ -1224,8 +1224,8 @@ acesso rápido</string>
     <!-- crossmix: the dj-style transition and how the listener can shape it -->
     <string name="crossmix_desc">No estilo de um DJ: analisa o ritmo, as batidas, o tom, a energia e a posição dos vocais de cada música. Depois escolhe a transição ideal e sincroniza as duas batidas, evitando que dois vocais se sobreponham.</string>
     <string name="crossmix_style_title">Transição</string>
-    <string name="crossmix_style_desc">Deixe o Mochy escolher a transição ideal para cada par de músicas ou use sempre a mesma.</string>
-    <string name="crossmix_style_auto">Deixar o Mochy escolher</string>
+    <string name="crossmix_style_desc">Deixe o VOID Music escolher a transição ideal para cada par de músicas ou use sempre a mesma.</string>
+    <string name="crossmix_style_auto">Deixar o VOID Music escolher</string>
     <string name="crossmix_style_choose">Escolher uma transição</string>
     <string name="crossmix_length_title">Duração</string>
     <string name="crossmix_length_desc">Por quanto tempo as duas músicas serão reproduzidas juntas. Transições longas exigem músicas com batidas sincronizáveis.</string>
@@ -1264,7 +1264,7 @@ acesso rápido</string>
     <string name="speed_only_this_song_detail">%1$s mantém esta velocidade e este tom. As outras músicas serão reproduzidas normalmente.</string>
     <string name="discord_custom_pick">Escolher uma imagem</string>
     <string name="discord_custom_change">Alterar imagem</string>
-    <string name="discord_custom_note">O Discord só exibe imagens da Web, então o Mochy envia a sua para um serviço gratuito de hospedagem de arquivos e a exibe por lá.</string>
+    <string name="discord_custom_note">O Discord só exibe imagens da Web, então o VOID Music envia a sua para um serviço gratuito de hospedagem de arquivos e a exibe por lá.</string>
     <string name="discord_custom_failed">Não foi possível usar essa imagem. Tente outra.</string>
     <string name="search_in_playlist">Pesquisar nesta playlist…</string>
     <string name="search_in_album">Pesquisar neste álbum…</string>
@@ -1283,11 +1283,11 @@ acesso rápido</string>
     <string name="recent_search_playlist">Playlist · %1$s</string>
     <string name="recent_search_artist">Artista</string>
     <string name="recent_search_remove">Remover das pesquisas recentes</string>
-    <string name="floating_lyrics_open">Abrir Mochy</string>
+    <string name="floating_lyrics_open">Abrir VOID Music</string>
     <string name="floating_lyrics_close">Fechar</string>
     <string name="floating_lyrics_never">Não mostrar novamente</string>
     <string name="floating_lyrics_turned_off">As letras flutuantes estão desativadas. Você pode ativá-las novamente nas Configurações.</string>
-    <string name="floating_lyrics_permission">Permita que o Mochy apareça sobre outros aplicativos para exibir letras flutuantes</string>
+    <string name="floating_lyrics_permission">Permita que o VOID Music apareça sobre outros aplicativos para exibir letras flutuantes</string>
     <string name="swipe_action_library">Adicionar ou remover da biblioteca</string>
     <string name="swipe_action_details">Ver detalhes</string>
     <string name="menu_ai_translation">Tradução por IA</string>
