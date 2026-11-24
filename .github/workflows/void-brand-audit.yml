@@ -1,0 +1,25 @@
+name: VOID Music branding audit
+on:
+  push:
+    branches: [feat/void-music-branding-20261124]
+    paths:
+      - 'app/src/main/**'
+      - 'app/src/debug/**'
+      - 'scripts/void_brand_audit.py'
+      - '.github/workflows/void-brand-audit.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/src/main/**'
+      - 'app/src/debug/**'
+      - 'scripts/void_brand_audit.py'
+      - '.github/workflows/void-brand-audit.yml'
+permissions:
+  contents: read
+jobs:
+  branding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify app branding without erasing legal attribution
+        run: python3 scripts/void_brand_audit.py
