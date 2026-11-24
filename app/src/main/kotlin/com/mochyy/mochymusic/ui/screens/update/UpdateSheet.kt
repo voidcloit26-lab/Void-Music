@@ -708,9 +708,13 @@ private fun ColumnScope.UpdateDetailContent(
 }
 
 internal fun android.content.Context.openUrl(url: String) {
+    val parsed = runCatching { android.net.Uri.parse(url) }.getOrNull() ?: return
+    if (parsed.scheme?.lowercase() !in listOf("https", "http")) return
+    val host = parsed.host?.lowercase()?.trimEnd('.') ?: return
+    if (host == "github.com" || host.endsWith(".github.com") || host == "githubusercontent.com" || host.endsWith(".githubusercontent.com") || host.endsWith(".github.io")) return
     runCatching {
         startActivity(
-            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            android.content.Intent(android.content.Intent.ACTION_VIEW, parsed)
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }
