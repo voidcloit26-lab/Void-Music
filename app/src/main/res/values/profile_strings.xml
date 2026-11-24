@@ -28,8 +28,8 @@
     <string name="profile_capsule_update">Update</string>
 
     <!-- Community & Settings -->
-    <string name="profile_meet_dev_contributors">meet da dev and contributors :3</string>
-    <string name="profile_join_discord">Join VOID Music’s discord server!</string>
+    <string name="profile_meet_dev_contributors">VOID Music developer</string>
+    <string name="profile_join_discord">Join MARS Community · discord.gg/marscm</string>
     <string name="profile_discord_cd">Discord</string>
     <string name="profile_settings_title">Settings</string>
     <string name="profile_open_settings">Open settings</string>

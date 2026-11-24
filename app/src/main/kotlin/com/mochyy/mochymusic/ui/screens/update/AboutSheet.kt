@@ -103,21 +103,27 @@ private data class ContributorEntry(
 private val LeadDevs =
     listOf(
         LeadDevEntry(
-            name = "Roo",
-            githubUser = "realidkroo",
+            name = "VOID",
+            githubUser = "voidcloit26-lab",
             devSpaceIndex = 0,
-            fallbackAvatar = R.drawable.frame_51_3,
-        ),
-        LeadDevEntry(
-            name = "key",
-            githubUser = "realkeichi",
-            devSpaceIndex = 1,
-            fallbackAvatar = R.drawable.dev_keycii,
+            fallbackAvatar = R.drawable.ic_mochy_mark,
         ),
     )
 
 private val BaseCredits =
     listOf(
+        CreditEntry(
+            name = "realidkroo",
+            subtitle = "Original Mochy Music creator and upstream developer",
+            githubUser = "realidkroo",
+            url = "https://github.com/realidkroo/Mochy-Music",
+        ),
+        CreditEntry(
+            name = "realkeichi",
+            subtitle = "Original Mochy Music contributor",
+            githubUser = "realkeichi",
+            url = "https://github.com/realidkroo/Mochy-Music",
+        ),
         CreditEntry(
             name = "vivizzz007",
             subtitle = "Vivimusic dev, The base of this app",
@@ -433,8 +439,8 @@ private fun ColumnScope.AboutSheetContent(
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AboutPillRow(
-                    text = stringResource(R.string.about_support_me),
-                    onClick = { popup.showSupportSheet() },
+                    text = "Join MARS Community",
+                    onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.DiscordUrl) },
                 )
                 AboutPillRow(
                     text = stringResource(R.string.about_github),
@@ -443,7 +449,7 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader("Original Mochy Music developers")
+            SectionHeader("VOID Music developer")
             Spacer(Modifier.height(8.dp))
             Column(
                 modifier =
@@ -466,7 +472,7 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_we_wont_exist))
+            SectionHeader("Original open-source projects and contributors")
             Spacer(Modifier.height(8.dp))
             Column(
                 modifier =

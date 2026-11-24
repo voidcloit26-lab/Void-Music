@@ -310,7 +310,7 @@ fun ProfileScreen(navController: NavController) {
     val time = rememberRecapTime(running = !storyCovering, held = { profile.holdsPage || obscured.value })
     val measurer = rememberTextMeasurer()
     val giant = remember {
-        GiantTextState("MOCHY", filledRows = 0..0).apply { color = { lerp(HeaderText, StoryTextDark, expand) } }
+        GiantTextState("VOID", filledRows = 0..0).apply { color = { lerp(HeaderText, StoryTextDark, expand) } }
     }
 
     // whether there's a recap waiting, so the pull hint can say so now and then
@@ -858,7 +858,7 @@ fun ProfileScreen(navController: NavController) {
             // ---- logo, and the greeting sliding into the bar beside it ----
             Icon(
                 painter = painterResource(R.drawable.ic_mochy_mark),
-                contentDescription = "Mochy",
+                contentDescription = "VOID Music",
                 tint = Color.White,
                 modifier = Modifier
                     .padding(start = HomeContentInset, top = statusBarTop + TopBarLogoTop)
@@ -1243,13 +1243,13 @@ private fun DiscordCard(onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Image(
-            painter = rememberResourcePainter(R.drawable.mochy_discord),
+            painter = rememberResourcePainter(R.drawable.ic_mochy_mark),
             contentDescription = stringResource(R.string.profile_discord_cd),
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(face)
                 .clip(CircleShape)
-                .background(Color.White),
+                .background(Color(0xFF11101D)),
         )
         Spacer(Modifier.width(12.dp))
         Text(
