@@ -126,6 +126,6 @@ fun PresenceButtonTarget.linkFor(track: NowPlaying): String {
         PresenceButtonTarget.SPOTIFY -> "https://open.spotify.com/search/$query"
         PresenceButtonTarget.APPLE_MUSIC -> "https://music.apple.com/search?term=$query"
         PresenceButtonTarget.TIDAL -> "https://listen.tidal.com/search?q=$query"
-        PresenceButtonTarget.MOCHY -> GithubRepoUrl
+        PresenceButtonTarget.MOCHY -> com.mochyy.mochymusic.core.updater.DiscordUrl
     }
 }
