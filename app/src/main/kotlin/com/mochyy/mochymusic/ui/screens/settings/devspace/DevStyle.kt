@@ -44,7 +44,8 @@ internal fun Context.openDevUrl(url: String) {
     val scheme = parsed.scheme?.lowercase()
     // never let a module or bad link fire intent://, file://, or javascript:
     if (scheme != "https" && scheme != "http") return
-    if (parsed.host.isNullOrBlank()) return
+    val host = parsed.host?.lowercase()?.trimEnd('.') ?: return
+    if (host.isBlank() || host == "github.com" || host.endsWith(".github.com") || host == "githubusercontent.com" || host.endsWith(".githubusercontent.com") || host.endsWith(".github.io")) return
     runCatching {
         startActivity(Intent(Intent.ACTION_VIEW, parsed).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }

@@ -150,7 +150,7 @@ class PhoneLinkHost @Inject constructor(
         advert = LinkAdvert(
             context,
             LinkWire.PhoneServiceType,
-            "Mochy ${LinkIdentity.name(context)}",
+            "VOID Music ${LinkIdentity.name(context)}",
             port,
             mapOf(
                 LinkWire.AttrId to LinkIdentity.id(context),
@@ -342,7 +342,7 @@ class PhoneLinkHost @Inject constructor(
 
     private fun route(request: LinkRequest): LinkResponse {
         // a device still on the old protocol sends its key in a header; told to update rather than turned away as unpaired, which made it forget this phone
-        if (request.header(LinkWire.OldKeyHeader) != null) return LinkResponse.status(426, "update mochy on that device")
+        if (request.header(LinkWire.OldKeyHeader) != null) return LinkResponse.status(426, "update VOID Music on that device")
         // the call must be signed by a paired device's key; the key itself is never in the call
         val from = verifier.verify(request) { id -> _devices.value.firstOrNull { it.id == id }?.key }
         val device = from?.let { id -> _devices.value.firstOrNull { it.id == id } }

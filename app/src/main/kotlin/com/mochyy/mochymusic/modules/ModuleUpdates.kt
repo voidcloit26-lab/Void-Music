@@ -28,7 +28,7 @@ sealed interface ModuleSource {
     /** where it comes from, the way the module's page shows it */
     val label: String
         get() = when (this) {
-            is GitHub -> "github.com/$owner/$repo"
+            is GitHub -> "Legacy module source"
             is Link -> base.substringAfter("://")
         }
 }
@@ -79,7 +79,7 @@ internal class ModuleUpdates(private val prefs: SharedPreferences, private val c
         // written first, so a source that's down or a rate limit isn't asked again on every visit
         prefs.edit { putLong(CheckedKey + id, now) }
         val found = when (source) {
-            is ModuleSource.GitHub -> newerRelease(source, preferDebug) ?: return
+            is ModuleSource.GitHub -> return
             is ModuleSource.Link -> newerManifest(source, installedVersion) ?: return
         }
         prefs.edit {

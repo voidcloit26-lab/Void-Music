@@ -63,14 +63,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImagePainter
-import coil3.compose.rememberAsyncImagePainter
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.link.tv.PairTarget
 import com.mochyy.mochymusic.link.tv.TvPairing
 import com.mochyy.mochymusic.link.tv.TvProfile
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // the light off her phone's screen, the blue of her hair
@@ -147,11 +144,10 @@ internal fun TvWelcome(onNext: () -> Unit) {
 // she swings in from the right with a little overshoot, then floats and sways while her phone glows
 @Composable
 private fun TvMascot(leave: () -> Float, modifier: Modifier = Modifier) {
-    // decoded off the main thread, and she only swings in once the picture is ready, so she never pops in halfway
-    val painter = rememberAsyncImagePainter(R.drawable.tv_mascot)
+    // The VOID vector is a local, synchronous resource. No asynchronous image state is needed.
+    val painter = painterResource(R.drawable.ic_mochy_mark)
     val arrive = remember { Animatable(0f) }
-    LaunchedEffect(painter) {
-        painter.state.first { it is AsyncImagePainter.State.Success || it is AsyncImagePainter.State.Error }
+    LaunchedEffect(Unit) {
         delay(120)
         arrive.animateTo(1f, spring(dampingRatio = 0.58f, stiffness = 110f))
     }

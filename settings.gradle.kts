@@ -1,5 +1,13 @@
 @file:Suppress("UnstableApiUsage")
 
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
 
@@ -16,7 +24,7 @@ dependencyResolutionManagement {
 //     id("org.gradle.toolchains.foojay-resolver-convention") version("1.0.0")
 // }
 
-rootProject.name = "mochy"
+rootProject.name = "void-music"
 include(":app")
 include(":providers:canvas")
 include(":providers:innertube")

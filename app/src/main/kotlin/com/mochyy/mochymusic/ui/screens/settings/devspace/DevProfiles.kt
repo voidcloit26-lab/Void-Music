@@ -70,20 +70,14 @@ internal data class DevPerson(
 
 internal val DevPeople = listOf(
     DevPerson(
-        name = "idkroo",
-        bio = "ui ux guy here uhh idk what to write here, pls star the repo",
-        avatar = R.drawable.frame_51_3,
-        takesDonations = true,
+        name = "VOID",
+        bio = "VOID Music · Independent Android music app by the VOID team. Join MARS Community for updates and feedback.",
+        avatar = R.drawable.ic_mochy_mark,
+        takesDonations = false,
         socials = listOf(
-            DevSocial("Instagram", InstagramUrl),
-            DevSocial("Discord", DiscordUrl),
-            DevSocial("Threads", ThreadsUrl),
-        ).filter { it.url.isNotBlank() },
-    ),
-    DevPerson(
-        name = "Keycii",
-        bio = "Hi hello hi",
-        avatar = R.drawable.dev_keycii,
+            DevSocial("Join MARS Community", DiscordUrl),
+            DevSocial("Contact VOID · Owner", com.mochyy.mochymusic.core.updater.OwnerDiscordUrl),
+        ),
     ),
 )
 
@@ -150,7 +144,7 @@ internal fun DevProfilePage(
                     }
                     if (person.socials.isNotEmpty()) {
                         val context = LocalContext.current
-                        SectionTitle("Socials")
+                        SectionTitle("Community & contact")
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             person.socials.forEach { social ->
                                 DevLinkRow(social.label) { context.openDevUrl(social.url) }

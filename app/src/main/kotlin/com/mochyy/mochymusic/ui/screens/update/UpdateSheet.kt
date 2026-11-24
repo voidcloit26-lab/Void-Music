@@ -121,15 +121,12 @@ private suspend fun checkUpdate(channel: UpdateChannel, force: Boolean): UpdateS
                 else -> UpdateState.UpToDate
             }
         },
-        onFailure = { UpdateState.Failed(it.message ?: "Couldn't reach GitHub") },
+        onFailure = { UpdateState.Failed(it.message ?: "Automatic updates are unavailable") },
     )
 
 /** shows the app version sheet as a PopupSheet, see docs/popup-sheet.skill.md */
 fun PopupSheetState.showUpdateSheet(updateState: UpdateState, onOpenDevSpace: (Int) -> Unit = {}) {
-    val popup = this
-    show(buttonBar = { SheetPrimaryButton(text = stringResource(R.string.done), onClick = popup::dismiss) }) {
-        UpdateSheetContent(initialState = updateState, popup = popup, onOpenDevSpace = onOpenDevSpace)
-    }
+    showAboutSheet(onOpenDevSpace = onOpenDevSpace)
 }
 
 private fun PopupSheetState.showUpdateDetailSheet(release: GithubRelease) {
@@ -209,7 +206,7 @@ private fun ColumnScope.UpdateSheetContent(
     Box(Modifier.fillMaxWidth()) {
         // centred just inside the sheet's top-right corner so its edge cuts the ring off, no size of its own so it never pushes content around
         VersionRing(
-            text = "MOCHY $installed",
+            text = "VOID MUSIC $installed",
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .layout { measurable, constraints ->
@@ -238,7 +235,7 @@ private fun ColumnScope.UpdateSheetContent(
             }
 
             Spacer(Modifier.height(14.dp))
-            Text("Mochy", fontSize = 17.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
+            Text("VOID Music", fontSize = 17.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     installed,
@@ -311,11 +308,7 @@ private fun ColumnScope.UpdateSheetContent(
                     label = stringResource(R.string.about_app),
                     onClick = { popup.showAboutSheet(onOpenDevSpace = onOpenDevSpace) },
                 )
-                ActionRow(
-                    icon = R.drawable.favorite,
-                    label = stringResource(R.string.update_help_us),
-                    onClick = { popup.showSupportSheet() },
-                )
+
             }
             Spacer(Modifier.height(6.dp))
         }
@@ -612,7 +605,7 @@ private fun ColumnScope.UpdateDetailContent(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = release.apkName ?: "mochy.apk",
+                text = release.apkName ?: "void-music.apk",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -715,9 +708,13 @@ private fun ColumnScope.UpdateDetailContent(
 }
 
 internal fun android.content.Context.openUrl(url: String) {
+    val parsed = runCatching { android.net.Uri.parse(url) }.getOrNull() ?: return
+    if (parsed.scheme?.lowercase() !in listOf("https", "http")) return
+    val host = parsed.host?.lowercase()?.trimEnd('.') ?: return
+    if (host == "github.com" || host.endsWith(".github.com") || host == "githubusercontent.com" || host.endsWith(".githubusercontent.com") || host.endsWith(".github.io")) return
     runCatching {
         startActivity(
-            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            android.content.Intent(android.content.Intent.ACTION_VIEW, parsed)
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     }

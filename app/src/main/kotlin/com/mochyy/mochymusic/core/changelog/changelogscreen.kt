@@ -139,7 +139,7 @@ fun ChangelogScreen(
                         showingCached = true
                     }
                 } else {
-                    val changelogUrl = URL("https://github.com/realidkroo/Mochy-Music/releases/download/$tag/changelog.json")
+                    val changelogUrl = URL("https://github.com/voidcloit26-lab/Void-Music/releases/download/$tag/changelog.json")
                     val connection = changelogUrl.openConnection() as HttpURLConnection
                     connection.setRequestProperty("User-Agent", "Mochy-Changelog-App")
                     connection.setRequestProperty("Accept", "application/json")

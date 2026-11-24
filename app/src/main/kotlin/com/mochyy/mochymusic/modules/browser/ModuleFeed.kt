@@ -326,7 +326,7 @@ class ModuleFeed @Inject constructor(
 
     companion object {
         // the worker's address (see the mochy-module-feed project); blank makes the browser say it isn't set up
-        const val FeedUrl = "https://mochy-module-feed.mochyy.workers.dev"
+        const val FeedUrl = ""
 
         private const val SessionKey = "session"
         private const val PrefsName = "module_browser"

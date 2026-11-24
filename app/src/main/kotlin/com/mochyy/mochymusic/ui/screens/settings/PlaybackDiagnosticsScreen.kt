@@ -197,5 +197,5 @@ private fun copyLogs(
             }
         }
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-    clipboard?.setPrimaryClip(ClipData.newPlainText("mochy playback log", text))
+    clipboard?.setPrimaryClip(ClipData.newPlainText("VOID Music playback log", text))
 }

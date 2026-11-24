@@ -103,21 +103,27 @@ private data class ContributorEntry(
 private val LeadDevs =
     listOf(
         LeadDevEntry(
-            name = "Roo",
-            githubUser = "realidkroo",
+            name = "VOID",
+            githubUser = "voidcloit26-lab",
             devSpaceIndex = 0,
-            fallbackAvatar = R.drawable.frame_51_3,
-        ),
-        LeadDevEntry(
-            name = "key",
-            githubUser = "realkeichi",
-            devSpaceIndex = 1,
-            fallbackAvatar = R.drawable.dev_keycii,
+            fallbackAvatar = R.drawable.ic_mochy_mark,
         ),
     )
 
 private val BaseCredits =
     listOf(
+        CreditEntry(
+            name = "realidkroo",
+            subtitle = "Original Mochy Music creator and upstream developer",
+            githubUser = "realidkroo",
+            url = "https://github.com/realidkroo/Mochy-Music",
+        ),
+        CreditEntry(
+            name = "realkeichi",
+            subtitle = "Original Mochy Music contributor",
+            githubUser = "realkeichi",
+            url = "https://github.com/realidkroo/Mochy-Music",
+        ),
         CreditEntry(
             name = "vivizzz007",
             subtitle = "Vivimusic dev, The base of this app",
@@ -188,120 +194,53 @@ private val Licenses =
     listOf(
         LicenseEntry(
             tag = "GPL-3.0",
-            title = "Mochy Music · GNU General Public License v3.0",
-            subtitle = "Free and open source software, source code on GitHub",
-            url = "$GithubRepoUrl/blob/main/LICENSE",
+            title = "Mochy Music (original project) · GPL-3.0",
+            subtitle = "Free and open-source software · license and corresponding source",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "ViviMusic · GNU General Public License v3.0",
             subtitle = "by vivizzz007 · base project this app was forked from",
-            url = "https://github.com/vivizzz007/vivi-music/blob/main/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "Metrolist · GNU General Public License v3.0",
             subtitle = "by Mostafa Alagamy · base framework",
-            url = "https://github.com/mostafaalagamy/Metrolist/blob/main/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "SimpMusic · GNU General Public License v3.0",
             subtitle = "by maxrave-dev · lyrics provider integration",
-            url = "https://github.com/maxrave-dev/SimpMusic/blob/dev/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "ArchiveTune · GNU General Public License v3.0",
             subtitle = "by Rukamori · design and architectural inspiration",
-            url = "https://github.com/rukamori/ArchiveTune/blob/main/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "GPL-3.0",
             title = "RiMusic · GNU General Public License v3.0",
             subtitle = "by fast4x · InnerTube API wrapper",
-            url = "https://github.com/fast4x/RiMusic/blob/master/LICENSE",
+            url = "https://www.gnu.org/licenses/gpl-3.0.html",
         ),
         LicenseEntry(
             tag = "MIT",
             title = "LRCLIB · MIT License",
             subtitle = "by tranxuanthang · synchronized lyrics database",
-            url = "https://github.com/tranxuanthang/lrclib/blob/main/LICENSE",
+            url = "https://opensource.org/license/mit",
         ),
         LicenseEntry(
             tag = "MIT",
             title = "AutoEq · MIT License",
             subtitle = "by Jaakko Pasanen · headphone correction profiles",
-            url = "https://github.com/jaakkopasanen/AutoEq/blob/master/LICENSE",
+            url = "https://opensource.org/license/mit",
         ),
     )
-
-//  this guy promote the app
-private val ExtraContributors =
-    listOf(
-        ContributorEntry(
-            login = "swtstvn",
-            avatarUrl = githubAvatarUrl("swtstvn"),
-            profileUrl = "https://github.com/swtstvn",
-        ),
-    )
-
-private val FallbackContributors =
-    listOf(
-        ContributorEntry(
-            login = "realidkroo",
-            avatarUrl = githubAvatarUrl("realidkroo"),
-            profileUrl = "https://github.com/realidkroo",
-        ),
-        ContributorEntry(
-            login = "realkeichi",
-            avatarUrl = githubAvatarUrl("realkeichi"),
-            profileUrl = "https://github.com/realkeichi",
-        ),
-    ) + ExtraContributors
-
-// kept in memory for the session so reopening the about sheet never hits github twice
-@Volatile
-private var cachedContributors: List<ContributorEntry>? = null
-
-// github redirects username.png straight to the user's current avatar without counting against the api rate limit
-private fun githubAvatarUrl(githubUser: String): String = "https://github.com/$githubUser.png?size=160"
-
-private suspend fun fetchContributors(): List<ContributorEntry> {
-    cachedContributors?.let { return it }
-    return withContext(Dispatchers.IO) {
-        runCatching {
-            val url = URL("https://api.github.com/repos/$GithubOwner/$GithubRepo/contributors?per_page=30")
-            val conn =
-                (url.openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 8_000
-                    readTimeout = 8_000
-                    setRequestProperty("Accept", "application/vnd.github+json")
-                    setRequestProperty("User-Agent", "mochy-android")
-                }
-            try {
-                val arr = JSONArray(conn.inputStream.bufferedReader().use { it.readText() })
-                buildList {
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.getJSONObject(i)
-                        val type = obj.optString("type", "User")
-                        if (type.equals("Bot", ignoreCase = true)) continue
-                        val login = obj.optString("login").takeIf { it.isNotBlank() } ?: continue
-                        if (login.endsWith("[bot]", ignoreCase = true)) continue
-                        val avatar = obj.optString("avatar_url").ifBlank { githubAvatarUrl(login) }
-                        val html = obj.optString("html_url").ifBlank { "https://github.com/$login" }
-                        add(ContributorEntry(login = login, avatarUrl = avatar, profileUrl = html))
-                    }
-                }.ifEmpty { FallbackContributors }
-                    .plus(ExtraContributors)
-                    .distinctBy { it.login.lowercase() }
-                    .also { cachedContributors = it }
-            } finally {
-                conn.disconnect()
-            }
-        }.getOrDefault(FallbackContributors)
-    }
-}
 
 fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
     val popup = this
@@ -310,17 +249,10 @@ fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
     }
 }
 
-private fun PopupSheetState.showCreditsSheet() {
+fun PopupSheetState.showLegalNoticesSheet() {
     val popup = this
     show(buttonBar = { SheetPrimaryButton(text = stringResource(R.string.done), onClick = popup::dismiss) }) {
-        CreditsSheetContent()
-    }
-}
-
-private fun PopupSheetState.showLicenseSheet() {
-    val popup = this
-    show(buttonBar = { SheetPrimaryButton(text = stringResource(R.string.done), onClick = popup::dismiss) }) {
-        LicenseSheetContent()
+        LegalNoticesContent()
     }
 }
 
@@ -333,18 +265,13 @@ private fun ColumnScope.AboutSheetContent(
     val installed = shortVersion(BuildConfig.VERSION_NAME)
     val scrollState = rememberScrollState()
     val ringScrollRangePx = with(LocalDensity.current) { 180.dp.toPx() }
-    var contributors by remember { mutableStateOf(cachedContributors ?: FallbackContributors) }
-
-    LaunchedEffect(Unit) {
-        contributors = fetchContributors()
-    }
 
     // the page starts under the sheet's handle now, so the ring and the first row sit that much lower
     val room = sheetHandleRoom()
     Box(Modifier.fillMaxWidth()) {
         // zero-size layout places the spinning ring behind the top icon without pushing the column down
         VersionRing(
-            text = "MOCHY $installed",
+            text = "VOID MUSIC $installed",
             scrollProgress = { scrollState.value / ringScrollRangePx },
             modifier =
                 Modifier
@@ -369,8 +296,8 @@ private fun ColumnScope.AboutSheetContent(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .verticalScroll(scrollState)
-                    .padding(top = room),
+                    .padding(top = room)
+                    .verticalScroll(scrollState),
         ) {
             Spacer(Modifier.height(18.dp))
             Column(
@@ -394,7 +321,7 @@ private fun ColumnScope.AboutSheetContent(
                 }
                 Spacer(Modifier.height(14.dp))
                 Text(
-                    text = stringResource(R.string.about_app),
+                    text = "VOID MUSIC",
                     fontSize = 36.sp,
                     lineHeight = 38.sp,
                     fontWeight = FontWeight.Bold,
@@ -402,7 +329,7 @@ private fun ColumnScope.AboutSheetContent(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.about_mochy_music_version, installed),
+                    text = "Version $installed · VOID Edition",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.4).sp,
@@ -420,7 +347,7 @@ private fun ColumnScope.AboutSheetContent(
                         .padding(horizontal = 18.dp, vertical = 16.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.about_app_description),
+                    text = "Your music. Your space. An independent music player maintained by VOID.",
                     fontSize = 15.sp,
                     lineHeight = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -429,21 +356,22 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_actions))
+            SectionHeader("Community & contact")
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AboutPillRow(
-                    text = stringResource(R.string.about_support_me),
-                    onClick = { popup.showSupportSheet() },
+                    text = "Join MARS Community",
+                    onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.DiscordUrl) },
                 )
                 AboutPillRow(
-                    text = stringResource(R.string.about_github),
-                    onClick = { context.openUrl(GithubRepoUrl) },
+                    text = "Contact VOID · Owner",
+                    onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) },
                 )
+
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_meet_lead_dev))
+            SectionHeader("Meet the maintainer")
             Spacer(Modifier.height(8.dp))
             Column(
                 modifier =
@@ -456,8 +384,8 @@ private fun ColumnScope.AboutSheetContent(
                 LeadDevs.forEach { dev ->
                     PersonRow(
                         name = dev.name,
-                        subtitle = null,
-                        avatarUrl = githubAvatarUrl(dev.githubUser),
+                        subtitle = "Founder / Owner",
+                        avatarUrl = "",
                         fallbackRes = dev.fallbackAvatar,
                         showArrow = true,
                         onClick = { onOpenDevSpace(dev.devSpaceIndex) },
@@ -465,137 +393,40 @@ private fun ColumnScope.AboutSheetContent(
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_we_wont_exist))
-            Spacer(Modifier.height(8.dp))
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MenuRowSurface)
-                        .padding(vertical = 6.dp),
-            ) {
-                BaseCredits.forEach { credit ->
-                    PersonRow(
-                        name = credit.name,
-                        subtitle = credit.subtitle,
-                        avatarUrl = githubAvatarUrl(credit.githubUser),
-                        showArrow = false,
-                        onClick = { context.openUrl(credit.url) },
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-            AndMoreRow(
-                avatars = remember { MoreCredits.take(3).map { githubAvatarUrl(it.githubUser) } },
-                onClick = { popup.showCreditsSheet() },
-            )
-
-            Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_license))
-            Spacer(Modifier.height(8.dp))
-            AboutCardButton(
-                text = stringResource(R.string.about_more_license),
-                onClick = { popup.showLicenseSheet() },
-            )
-
-            Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_cool_contributors))
-            Spacer(Modifier.height(8.dp))
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MenuRowSurface)
-                        .padding(vertical = 6.dp),
-            ) {
-                contributors.forEach { contributor ->
-                    PersonRow(
-                        name = contributor.login,
-                        subtitle = null,
-                        avatarUrl = contributor.avatarUrl,
-                        showArrow = false,
-                        onClick = { context.openUrl(contributor.profileUrl) },
-                    )
-                }
-            }
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
 @Composable
-private fun ColumnScope.CreditsSheetContent() {
+private fun ColumnScope.LegalNoticesContent() {
     val context = LocalContext.current
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(top = sheetHandleRoom()),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = sheetHandleRoom())
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.about_credits),
-            fontSize = 36.sp,
-            lineHeight = 38.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-1.4).sp,
-        )
-        Spacer(Modifier.height(16.dp))
+        Text("Legal & open-source notices", fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+        Text("VOID Music is a modified open-source project. Original copyrights remain with their respective authors.", fontSize = 13.sp)
+        SectionHeader("Attribution")
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MenuRowSurface)
-                    .padding(vertical = 6.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MenuRowSurface).padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             (BaseCredits + MoreCredits).forEach { credit ->
-                PersonRow(
-                    name = credit.name,
-                    subtitle = credit.subtitle,
-                    avatarUrl = githubAvatarUrl(credit.githubUser),
-                    showArrow = true,
-                    onClick = { context.openUrl(credit.url) },
-                )
+                Text(credit.name + " — " + credit.subtitle, fontSize = 13.sp, lineHeight = 18.sp)
             }
         }
-        Spacer(Modifier.height(8.dp))
-    }
-}
-
-@Composable
-private fun ColumnScope.LicenseSheetContent() {
-    val context = LocalContext.current
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(top = sheetHandleRoom()),
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.about_license),
-            fontSize = 36.sp,
-            lineHeight = 38.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-1.4).sp,
-        )
-        Spacer(Modifier.height(16.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Licenses.forEach { entry ->
-                LicenseCard(
-                    entry = entry,
-                    onClick = { context.openUrl(entry.url) },
-                )
-            }
+        SectionHeader("Software licenses")
+        Licenses.forEach { entry ->
+            AboutPillRow(text = entry.tag + " · " + entry.title.substringBefore(" · "), onClick = { context.openUrl(entry.url) })
+            Text(entry.subtitle, fontSize = 12.sp)
         }
-        Spacer(Modifier.height(8.dp))
+        Text("Corresponding source and license information: contact the VOID maintainer.", fontSize = 13.sp)
+        AboutPillRow(text = "Contact VOID", onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
+        Spacer(Modifier.height(12.dp))
     }
 }
 
@@ -622,9 +453,9 @@ private fun AboutPillRow(
             Modifier
                 .pressBounce(interaction, pressedScale = 0.97f)
                 .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MenuRowSurface)
+                .height(52.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xFF252536))
                 .clickable(interactionSource = interaction, indication = RemoteFocus, onClick = onClick)
                 .padding(horizontal = 18.dp),
     ) {

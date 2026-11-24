@@ -181,7 +181,7 @@ fun UpdatePromptSheet(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = release.apkName ?: "mochy.apk",
+                        text = release.apkName ?: "void-music.apk",
                         color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,

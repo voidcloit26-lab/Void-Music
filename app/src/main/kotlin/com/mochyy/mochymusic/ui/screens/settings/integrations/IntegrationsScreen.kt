@@ -10,6 +10,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
+import com.mochyy.mochymusic.ui.screens.settings.devspace.openDevUrl
+import com.mochyy.mochymusic.core.updater.DiscordUrl
+import com.mochyy.mochymusic.core.updater.OwnerDiscordUrl
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.mochyy.mochymusic.R
@@ -29,11 +33,27 @@ private val BackupBlue = Color(0xFF2F7CF6)
 
 @Composable
 fun IntegrationsScreen(navController: NavController) {
+    val context = LocalContext.current
     SubSettingsScaffold(
         title = stringResource(R.string.integrations),
         onBack = { navController.navigateUp() },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            IntegrationPageSubtitle("VOID Community")
+            IntegrationRow(
+                name = "MARS Community",
+                description = "Official community and app support",
+                icon = R.drawable.integration_discord,
+                onClick = { context.openDevUrl(DiscordUrl) },
+            )
+            IntegrationRow(
+                name = "Contact VOID",
+                description = "Founder / Owner · Discord profile",
+                icon = R.drawable.ic_mochy_mark,
+                onClick = { context.openDevUrl(OwnerDiscordUrl) },
+            )
+            Spacer(Modifier.height(12.dp))
+            IntegrationPageSubtitle("Connected services")
             IntegrationRow(
                 name = "Discord",
                 description = stringResource(R.string.integration_discord_desc),

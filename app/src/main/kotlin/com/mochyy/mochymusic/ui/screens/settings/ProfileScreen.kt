@@ -310,7 +310,7 @@ fun ProfileScreen(navController: NavController) {
     val time = rememberRecapTime(running = !storyCovering, held = { profile.holdsPage || obscured.value })
     val measurer = rememberTextMeasurer()
     val giant = remember {
-        GiantTextState("MOCHY", filledRows = 0..0).apply { color = { lerp(HeaderText, StoryTextDark, expand) } }
+        GiantTextState("VOID", filledRows = 0..0).apply { color = { lerp(HeaderText, StoryTextDark, expand) } }
     }
 
     // whether there's a recap waiting, so the pull hint can say so now and then
@@ -811,6 +811,8 @@ fun ProfileScreen(navController: NavController) {
                         DeveloperCard(onClick = { navController.navigate("developer_space") })
                         Spacer(Modifier.height(16.dp))
                         DiscordCard(onClick = { context.openDevUrl(DiscordUrl) })
+                        Spacer(Modifier.height(8.dp))
+                        DiscordCard(label = "Contact VOID · Owner", onClick = { context.openDevUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
                         Spacer(Modifier.height(28.dp))
                         Text(stringResource(R.string.profile_settings_title), style = PageTitle.copy(fontSize = 15.sp), modifier = Modifier.padding(start = 2.dp, bottom = 10.dp))
                         OpenSettingsRow(onClick = { navController.navigate("mochy_settings") })
@@ -858,7 +860,7 @@ fun ProfileScreen(navController: NavController) {
             // ---- logo, and the greeting sliding into the bar beside it ----
             Icon(
                 painter = painterResource(R.drawable.ic_mochy_mark),
-                contentDescription = "Mochy",
+                contentDescription = "VOID Music",
                 tint = Color.White,
                 modifier = Modifier
                     .padding(start = HomeContentInset, top = statusBarTop + TopBarLogoTop)
@@ -1231,7 +1233,7 @@ private fun DeveloperCard(onClick: () -> Unit) {
 }
 
 @Composable
-private fun DiscordCard(onClick: () -> Unit) {
+private fun DiscordCard(label: String = "Join MARS Community", onClick: () -> Unit) {
     val face = 30.dp
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1243,17 +1245,17 @@ private fun DiscordCard(onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Image(
-            painter = rememberResourcePainter(R.drawable.mochy_discord),
+            painter = rememberResourcePainter(R.drawable.ic_mochy_mark),
             contentDescription = stringResource(R.string.profile_discord_cd),
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(face)
                 .clip(CircleShape)
-                .background(Color.White),
+                .background(Color(0xFF11101D)),
         )
         Spacer(Modifier.width(12.dp))
         Text(
-            stringResource(R.string.profile_join_discord),
+            label,
             style = TextStyle(fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = (-0.6).sp, color = Color.White),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

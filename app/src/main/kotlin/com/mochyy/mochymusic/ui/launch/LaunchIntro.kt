@@ -462,40 +462,27 @@ private fun Density.placementAt(state: LaunchIntroState, size: IntSize): MarkPla
 
 /** the two marks, in the splash drawable's units, ready to draw at any scale */
 private class LaunchMarkArt {
-    private val triangle = path(
-        "M163.5 96.3493C180.167 105.972 180.167 130.028 163.5 139.651L108 171.694C91.3333 181.316 " +
-            "70.5 169.288 70.5 150.043V85.9569C70.5 66.7119 91.3333 54.6838 108 64.3063L163.5 96.3493Z"
-    )
+    private val triangle = path("M77 77 L101 77 L117 119 L135 77 L160 77 L128 161 L111 161 Z")
     // the face: the little chevron and the smile under it
-    private val face = path("M97 112L108.5 98L120 112M110.325 125C111.871 133.439 121.868 148.704 142.944 149.92")
+    private val face = path("M132 112 L132 146 L157 129 Z")
     private val mask = Path().apply { addCircle(Pivot.x, Pivot.y, SplashMaskRadius, Path.Direction.CW) }
 
     // ic_splash_mark: a white shape with a dark outline and a dark face
     private val fill = paint(android.graphics.Color.WHITE) { style = Paint.Style.FILL }
     private val darkOutline = paint(0xFF212121.toInt()) {
         style = Paint.Style.STROKE
-        strokeWidth = 19f
+        strokeWidth = 9f
         strokeJoin = Paint.Join.ROUND
     }
-    private val darkFace = paint(0xFF212121.toInt()) {
-        style = Paint.Style.STROKE
-        strokeWidth = 11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
+    private val darkFace = paint(0xFFA98BFF.toInt()) { style = Paint.Style.FILL }
 
     // ic_mochy_mark: the same outline and face, white, nothing filled
     private val lightOutline = paint(android.graphics.Color.WHITE) {
         style = Paint.Style.STROKE
-        strokeWidth = 19f
+        strokeWidth = 9f
         strokeJoin = Paint.Join.ROUND
     }
-    private val lightFace = paint(android.graphics.Color.WHITE) {
-        style = Paint.Style.STROKE
-        strokeWidth = 11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
+    private val lightFace = paint(android.graphics.Color.WHITE) { style = Paint.Style.FILL }
 
     fun draw(canvas: android.graphics.Canvas, filledAlpha: Float, outlineAlpha: Float, filledScale: Float = 1f) {
         // each mark is faded as a whole, so its overlapping strokes never show through each other

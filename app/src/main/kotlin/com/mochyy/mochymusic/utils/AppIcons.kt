@@ -25,7 +25,7 @@ enum class AppIconFamily(@StringRes val title: Int) {
     fun artOn(color: AppIconColor): Int = when (this) {
         Mark -> R.drawable.ic_launcher_mark
         Outline -> if (color.pale) R.drawable.ic_launcher_outline_dark else R.drawable.ic_launcher_monochrome
-        Anime -> R.drawable.ic_launcher_anime
+        Anime -> R.drawable.ic_launcher_mark
     }
 }
 
@@ -71,10 +71,10 @@ class AppIcon private constructor(
             AppIcon("OutlineBlack", "IconOutlineBlack", AppIconFamily.Outline, R.drawable.ic_launcher_monochrome, R.color.app_icon_black, R.string.app_icon_outline_black),
             AppIcon("OutlineMaterial", "IconOutlineMaterial", AppIconFamily.Outline, R.drawable.ic_launcher_monochrome, R.color.app_icon_material, R.string.app_icon_outline_material),
             AppIcon("OutlineTransparent", "IconOutlineTransparent", AppIconFamily.Outline, R.drawable.ic_launcher_monochrome, null, R.string.app_icon_outline_transparent),
-            AppIcon("AnimeWhite", "IconAnimeWhite", AppIconFamily.Anime, R.drawable.ic_launcher_anime, R.color.app_icon_white, R.string.app_icon_anime_white),
-            AppIcon("AnimeDark", "IconAnimeDark", AppIconFamily.Anime, R.drawable.ic_launcher_anime, R.color.app_icon_black, R.string.app_icon_anime_dark),
-            AppIcon("AnimeMaterial", "IconAnimeMaterial", AppIconFamily.Anime, R.drawable.ic_launcher_anime, R.color.app_icon_material, R.string.app_icon_anime_material),
-            AppIcon("AnimeTransparent", "IconAnimeTransparent", AppIconFamily.Anime, R.drawable.ic_launcher_anime, null, R.string.app_icon_anime_transparent),
+            AppIcon("AnimeWhite", "IconAnimeWhite", AppIconFamily.Anime, R.drawable.ic_launcher_mark, R.color.app_icon_white, R.string.app_icon_anime_white),
+            AppIcon("AnimeDark", "IconAnimeDark", AppIconFamily.Anime, R.drawable.ic_launcher_mark, R.color.app_icon_black, R.string.app_icon_anime_dark),
+            AppIcon("AnimeMaterial", "IconAnimeMaterial", AppIconFamily.Anime, R.drawable.ic_launcher_mark, R.color.app_icon_material, R.string.app_icon_anime_material),
+            AppIcon("AnimeTransparent", "IconAnimeTransparent", AppIconFamily.Anime, R.drawable.ic_launcher_mark, null, R.string.app_icon_anime_transparent),
         )
 
         // every family on every custom colour, named MarkRed with the alias IconMarkRed, as the manifest has them

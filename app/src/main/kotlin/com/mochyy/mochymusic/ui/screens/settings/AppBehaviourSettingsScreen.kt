@@ -52,6 +52,7 @@ import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.component.LocalZoomOutOverlayState
 import com.mochyy.mochymusic.ui.component.SettingsItem
 import com.mochyy.mochymusic.ui.component.SubSettingsScaffold
+import com.mochyy.mochymusic.ui.screens.update.showLegalNoticesSheet
 import com.mochyy.mochymusic.ui.component.SubSettingsSearchBar
 import com.mochyy.mochymusic.ui.player.LarpLevel
 import com.mochyy.mochymusic.utils.AppProxy
@@ -77,8 +78,25 @@ fun AppBehaviourSettingsScreen(navController: NavController) {
         SettingsSection(stringResource(R.string.settings_section_library_privacy), libraryItems().matching(query))
         SettingsSection(stringResource(R.string.settings_section_lyrics), lyricsItems().matching(query))
         SettingsSection(stringResource(R.string.settings_related), relatedItems(navController).matching(query))
+        SettingsSection("Legal", legalItems().matching(query))
         Spacer(Modifier.height(140.dp))
     }
+}
+
+@Composable
+private fun legalItems(): List<SettingsItem> {
+    val overlay = LocalZoomOutOverlayState.current
+    return listOf(
+        SettingsItem(
+            title = { Text("Legal & open-source notices") },
+            highlightKey = "Legal & open-source notices",
+            searchText = "Legal credits license copyright source notices",
+            descriptionText = "Software licenses and attribution",
+            icon = painterResource(R.drawable.info),
+            iconShape = CircleShape,
+            onClick = { overlay.showLegalNoticesSheet() },
+        ),
+    )
 }
 
 // there's no limit to the larp
