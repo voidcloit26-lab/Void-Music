@@ -89,6 +89,14 @@ for relative, forbidden in {
         if token in source:
             errors.append(f"Upstream promotional entry point {token!r} in {relative}")
 
+check_file(src + "core/updater/GithubUpdates.kt", 'const val OwnerDiscordUrl = "https://discord.com/users/1472442073108971575"', "VOID owner URL")
+check_file(src + "ui/screens/settings/devspace/DevProfiles.kt", "OwnerDiscordUrl", "Owner profile contact")
+check_file(src + "ui/screens/update/AboutSheet.kt", "OwnerDiscordUrl", "About contact")
+check_file(src + "modules/GitHubReleases.kt", "Found = Found.Unreachable", "No module release API")
+check_file(src + "discord/DiscordPresence.kt", "PresencePicture.Logo -> emptyList()", "No repository logo requests")
+if (ROOT / ".github/FUNDING.yml").exists():
+    errors.append("Upstream funding configuration present")
+
 print("VOID Music branding audit")
 print(f"English resource checks: {len(list(english.glob('*.xml')))} files")
 for warning in warnings[:10]:
