@@ -1,3 +1,15 @@
+# VOID Music
+
+**An independent Android music player fork, being developed by VOID.** Built on [Mochy Music](https://github.com/realidkroo/Mochy-Music), with new VOID branding and a separate package ID (`online.voidbot.music`). This source is licensed under GNU GPL-3.0 and retains its upstream attribution.
+
+> **Development status (24 November 2026):** source branding is in progress on `feat/void-music-branding-20261124`. No VOID-branded APK has been compiled or verified yet. The original playback engines remain unchanged; availability of tracks, lyrics, offline downloads and source integrations depends on providers and their terms.
+
+See [VOID Music release checklist](VOID_MUSIC_RELEASE_CHECKLIST.md) and [source attribution](VOID_MUSIC_ATTRIBUTION.md). Neither universal music coverage nor uninterrupted streaming is guaranteed.
+
+---
+
+## Original Mochy Music project information and credits
+
 <img width="1799" height="927" alt="Frame 420" src="https://github.com/user-attachments/assets/c5e1d307-ecc4-4c26-a88f-f4f468c8e434" />
 
 <div align="center">
