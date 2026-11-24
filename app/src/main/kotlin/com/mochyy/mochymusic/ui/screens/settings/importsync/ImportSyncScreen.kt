@@ -152,12 +152,12 @@ fun ImportSyncScreen(
             items = listOf(
                 SettingsItem(
                     title = { Text(stringResource(R.string.import_sync_export_csv_title)) },
-                    highlightKey = "Export to Mochy CSV",
+                    highlightKey = "Export to VOID Music CSV",
                     descriptionText = stringResource(R.string.import_sync_export_csv_desc),
                     detail = stringResource(R.string.import_sync_export_csv_detail),
                     icon = painterResource(R.drawable.backup),
                     iconShape = CircleShape,
-                    onClick = { exportLauncher.launch("mochy-library-${LocalDate.now()}.csv") },
+                    onClick = { exportLauncher.launch("void-music-library-${LocalDate.now()}.csv") },
                 ),
             ),
         )
