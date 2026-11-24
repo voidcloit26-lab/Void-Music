@@ -69,6 +69,26 @@ unmigrated = sum(bool(brand.search(p.read_text(encoding="utf-8"))) for p in loca
 if unmigrated:
     warnings.append(f"{unmigrated} translated resource files still contain legacy strings/identifiers; locale review required")
 
+# Keep promotional entry points disabled, including old saved settings.
+src = "app/src/main/kotlin/com/mochyy/mochymusic/"
+check_file(src + "ui/screens/donate/DonatePrompt.kt", "fun DonatePromptScheduler(enabled: Boolean) = Unit", "No automatic donation prompts")
+check_file(src + "ui/screens/donate/DonateSheet.kt", "fun PopupSheetState.showDonateSheet() = Unit", "No donation sheet")
+check_file(src + "ui/screens/donate/SupportSheet.kt", "fun PopupSheetState.showSupportSheet() = Unit", "No support promotion")
+check_file(src + "ui/screens/settings/devspace/DevSpaceData.kt", "maxAgeMs: Long = 60_000L) = Unit", "No repository telemetry")
+check_file(src + "discord/PresenceActivity.kt", "PresenceButtonTarget.MOCHY -> com.mochyy.mochymusic.core.updater.DiscordUrl", "MARS presence link")
+check_file(src + "core/updater/GithubUpdates.kt", 'Result.failure(IllegalStateException("Automatic updates are unavailable in this build"))', "No GitHub app update requests")
+for relative, forbidden in {
+    "ui/screens/donate/DonateSheet.kt": ("ko-fi.com/", "sociabuzz.com/", "buymeacoffee.com/"),
+    "ui/screens/update/AboutSheet.kt": ("contributors = fetchContributors()", "stringResource(R.string.about_github)", "SectionHeader(stringResource(R.string.about_cool_contributors))"),
+    "ui/screens/update/UpdateSheet.kt": ("label = stringResource(R.string.update_help_us)",),
+    "ui/screens/settings/devspace/DeveloperSpaceScreen.kt": ("PlaygroundCard(stats =", "DevSpaceRepository.refresh("),
+    "discord/PresenceSettings.kt": ("VOID Music on GitHub",),
+}.items():
+    source = (ROOT / (src + relative)).read_text(encoding="utf-8")
+    for token in forbidden:
+        if token in source:
+            errors.append(f"Upstream promotional entry point {token!r} in {relative}")
+
 print("VOID Music branding audit")
 print(f"English resource checks: {len(list(english.glob('*.xml')))} files")
 for warning in warnings[:10]:
