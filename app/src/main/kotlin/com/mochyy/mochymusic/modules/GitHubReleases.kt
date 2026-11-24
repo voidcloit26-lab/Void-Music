@@ -45,22 +45,8 @@ internal object GitHubReleases {
     }
 
     /** the release the link points at and its module zip, without downloading the zip; blocking, so off the main thread */
-    fun release(client: OkHttpClient, link: Link, preferDebug: Boolean): Found {
-        val api = "https://api.github.com/repos/${link.owner}/${link.repo}/releases/" + (link.tag?.let { "tags/$it" } ?: "latest")
-        val release = try {
-            client.newCall(apiRequest(api)).execute().use { response ->
-                // latest skips drafts and pre-releases, so a project with only those reads as having none
-                if (response.code == 404) return Found.NoRelease
-                if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
-                JSONObject(response.body.string())
-            }
-        } catch (e: Exception) {
-            return Found.Unreachable
-        }
-        val asset = pickAsset(release, preferDebug) ?: return Found.NoModule
-        val tag = release.optString("tag_name").ifBlank { release.optString("name") }.ifBlank { asset.name }
-        return Found.Newest(Release(tag, asset.name, asset.url, asset.stamp))
-    }
+    // Independent builds do not query repository release APIs.
+    fun release(client: OkHttpClient, link: Link, preferDebug: Boolean): Found = Found.Unreachable
 
     /** the release's module zip, downloaded into the cache; blocking, so off the main thread */
     fun download(client: OkHttpClient, cacheDir: File, link: Link, preferDebug: Boolean): Found {
