@@ -69,10 +69,10 @@ class AccessStore:
             raise ValueError("uses must be 1..1000")
         if ttl_seconds is not None and (type(ttl_seconds) is not int or not 1 <= ttl_seconds <= 31_536_000):
             raise ValueError("invalid redemption expiry")
-        now = int(time.time())
         raw = secrets.token_hex(16).upper()
         code = "VOID-" + "-".join(raw[i:i+8] for i in range(0, 32, 8))
         with self._transaction() as db:
+            now = int(time.time())
             self._cleanup(db, now)
             db.execute("INSERT INTO invitations VALUES (?, ?, ?)",
                        (self._digest(code), uses, None if ttl_seconds is None else now + ttl_seconds))
@@ -88,8 +88,8 @@ class AccessStore:
         code = code.strip().upper()
         if not CODE_RE.fullmatch(code):
             raise AccessDenied("invalid invitation")
-        now = int(time.time())
         with self._transaction() as db:
+            now = int(time.time())
             self._cleanup(db, now)
             existing = db.execute("SELECT device_fingerprint, revoked_at FROM activations WHERE account_id=?", (account_id,)).fetchone()
             if existing:
@@ -119,6 +119,47 @@ class AccessStore:
             row = db.execute("SELECT 1 FROM activations WHERE account_id=? AND device_fingerprint=? AND revoked_at IS NULL",
                              (account_id, device_fingerprint)).fetchone()
             return row is not None
+
+    def list_invitations(self):
+        """Only expose HMAC identifiers, never the original invitation."""
+        with self._transaction() as db:
+            self._cleanup(db, int(time.time()))
+            return [
+                {"id": digest.hex(), "remaining": remaining, "expires_at": expires}
+                for digest, remaining, expires in db.execute(
+                    "SELECT digest, remaining, expires_at FROM invitations ORDER BY expires_at"
+                )
+            ]
+
+    def list_activations(self):
+        with self._transaction() as db:
+            return [
+                {"account_id": account, "device_fingerprint": device,
+                 "activated_at": activated, "revoked_at": revoked}
+                for account, device, activated, revoked in db.execute(
+                    "SELECT account_id, device_fingerprint, activated_at, revoked_at FROM activations ORDER BY activated_at DESC"
+                )
+            ]
+
+    def cancel_id(self, invitation_id):
+        if not isinstance(invitation_id, str) or not FINGERPRINT_RE.fullmatch(invitation_id):
+            return False
+        with self._transaction() as db:
+            return db.execute("DELETE FROM invitations WHERE digest=?", (bytes.fromhex(invitation_id),)).rowcount == 1
+
+    def transfer(self, account_id, expected_device, new_device):
+        """Privileged owner action. Caller must verify the replacement device."""
+        if not all(isinstance(d, str) and FINGERPRINT_RE.fullmatch(d) for d in (expected_device, new_device)):
+            raise AccessDenied("invalid device")
+        if expected_device == new_device:
+            return False
+        with self._transaction() as db:
+            if db.execute("SELECT 1 FROM activations WHERE device_fingerprint=?", (new_device,)).fetchone():
+                raise AccessDenied("replacement device already assigned")
+            return db.execute(
+                "UPDATE activations SET device_fingerprint=? WHERE account_id=? AND device_fingerprint=? AND revoked_at IS NULL",
+                (new_device, account_id, expected_device)
+            ).rowcount == 1
 
     def cancel(self, code):
         if not isinstance(code, str) or len(code) > 64 or not CODE_RE.fullmatch(code.strip().upper()):
