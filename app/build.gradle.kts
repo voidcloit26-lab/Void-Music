@@ -255,13 +255,9 @@ extensions.configure<ApplicationExtension> {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Fall back to the debug keystore locally so a release-quality build is always
-            // runnable on a dev machine. CI still signs with the real key when secrets exist.
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // Never silently sign a distribution release with a test/debug key.
+            // The separate fast/profileable builds remain available for local testing.
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
         debug {
             applicationIdSuffix = ".debug"
