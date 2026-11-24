@@ -811,6 +811,8 @@ fun ProfileScreen(navController: NavController) {
                         DeveloperCard(onClick = { navController.navigate("developer_space") })
                         Spacer(Modifier.height(16.dp))
                         DiscordCard(onClick = { context.openDevUrl(DiscordUrl) })
+                        Spacer(Modifier.height(8.dp))
+                        DiscordCard(label = "Contact VOID · Owner", onClick = { context.openDevUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
                         Spacer(Modifier.height(28.dp))
                         Text(stringResource(R.string.profile_settings_title), style = PageTitle.copy(fontSize = 15.sp), modifier = Modifier.padding(start = 2.dp, bottom = 10.dp))
                         OpenSettingsRow(onClick = { navController.navigate("mochy_settings") })
@@ -1231,7 +1233,7 @@ private fun DeveloperCard(onClick: () -> Unit) {
 }
 
 @Composable
-private fun DiscordCard(onClick: () -> Unit) {
+private fun DiscordCard(label: String = "Join MARS Community", onClick: () -> Unit) {
     val face = 30.dp
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -1253,7 +1255,7 @@ private fun DiscordCard(onClick: () -> Unit) {
         )
         Spacer(Modifier.width(12.dp))
         Text(
-            stringResource(R.string.profile_join_discord),
+            label,
             style = TextStyle(fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, letterSpacing = (-0.6).sp, color = Color.White),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
