@@ -100,27 +100,8 @@ private val updateScope = kotlinx.coroutines.CoroutineScope(
 )
 
 /** Every published release, asked for once and shared for [CacheTtlMillis] unless [force]d. */
-private suspend fun getReleases(force: Boolean): Result<List<ParsedRelease>> {
-    val deferred = synchronized(cacheLock) {
-        if (!force) {
-            val cached = cachedResult
-            if (cached != null && System.currentTimeMillis() - cachedAt < CacheTtlMillis) {
-                return cached
-            }
-        }
-        inFlight ?: updateScope.async { fetchReleases() }.also { inFlight = it }
-    }
-
-    val result = deferred.await()
-    synchronized(cacheLock) {
-        if (inFlight === deferred) inFlight = null
-        if (result.isSuccess) {
-            cachedResult = result
-            cachedAt = System.currentTimeMillis()
-        }
-    }
-    return result
-}
+private suspend fun getReleases(force: Boolean): Result<List<ParsedRelease>> =
+    Result.failure(IllegalStateException("Automatic updates are unavailable in this build"))
 
 // release only sees releases; nightly sees the prereleases and the releases, and takes the newest of all
 private fun ParsedRelease.inChannel(channel: UpdateChannel) = channel == UpdateChannel.Nightly || !release.isNightly
