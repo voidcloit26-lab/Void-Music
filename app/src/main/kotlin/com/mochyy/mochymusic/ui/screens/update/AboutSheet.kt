@@ -188,7 +188,7 @@ private val Licenses =
     listOf(
         LicenseEntry(
             tag = "GPL-3.0",
-            title = "Mochy Music · GNU General Public License v3.0",
+            title = "Mochy Music (original project) · GPL-3.0",
             subtitle = "Free and open source software, source code on GitHub",
             url = "$GithubRepoUrl/blob/main/LICENSE",
         ),
@@ -344,7 +344,7 @@ private fun ColumnScope.AboutSheetContent(
     Box(Modifier.fillMaxWidth()) {
         // zero-size layout places the spinning ring behind the top icon without pushing the column down
         VersionRing(
-            text = "MOCHY $installed",
+            text = "VOID MUSIC $installed",
             scrollProgress = { scrollState.value / ringScrollRangePx },
             modifier =
                 Modifier
@@ -443,7 +443,7 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader(stringResource(R.string.about_meet_lead_dev))
+            SectionHeader("Original Mochy Music developers")
             Spacer(Modifier.height(8.dp))
             Column(
                 modifier =

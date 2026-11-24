@@ -172,11 +172,11 @@ bool clearIfException(JNIEnv* env) {
 }
 
 bool isAllowedPackage(const std::string& pkg) {
-    if (pkg == "com.mochyy.mochymusic") return true;
+    if (pkg == "online.voidbot.music") return true;
     if (kRequireReleasePackage == 0) {
-        return pkg == "com.mochyy.mochymusic.debug" ||
-               pkg == "com.mochyy.mochymusic.fast" ||
-               pkg == "com.mochyy.mochymusic.profileable";
+        return pkg == "online.voidbot.music.debug" ||
+               pkg == "online.voidbot.music.fast" ||
+               pkg == "online.voidbot.music.profileable";
     }
     return false;
 }

@@ -558,7 +558,7 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(
                         painter = painterResource(R.drawable.ic_mochy_mark),
-                        contentDescription = "Mochy",
+                        contentDescription = "VOID Music",
                         tint = Color.White,
                         modifier = Modifier.size(SettingsMarkSize),
                     )
