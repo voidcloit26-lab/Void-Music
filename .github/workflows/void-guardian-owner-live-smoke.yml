@@ -46,4 +46,27 @@ jobs:
           assert request("/logout", {"csrf":"invalid"}, {"Origin":base})[0] == 401
           assert request("/v1/generate")[0] == 404
           print("PASS: cross-origin login and unauthorized management blocked; no real credentials or invitations used")
+          import json
+          def native(action, data, headers=None):
+              request = urllib.request.Request(base+"/native/v1/"+action,
+                  data=json.dumps(data).encode(),
+                  headers={"Content-Type":"application/json", **(headers or {})})
+              try:
+                  response = opener.open(request, timeout=90)
+              except urllib.error.HTTPError as exc:
+                  response = exc
+              with response:
+                  assert response.headers.get("Cache-Control") == "no-store"
+                  assert response.headers.get_content_type() == "application/json"
+                  assert not response.headers.get("Access-Control-Allow-Origin")
+                  assert not response.headers.get("Set-Cookie")
+                  return response.status, json.load(response)
+          assert native("login", {})[0] == 400
+          assert native("login", {}, {"Origin":"https://invalid.example"})[0] == 403
+          for action, data in (("list",{}), ("generate",{"uses":1,"ttl":3600}),
+                               ("cancel",{"id":"0"*64}), ("revoke",{"id":"12345678901234567890"}), ("logout",{})):
+              assert native(action, data) == (401, {"error":"session_expired"})
+          assert native("list", {}, {"Authorization":"Bearer "+"A"*43})[0] == 401
+          assert native("list", {}, {"Cookie":"__Host-guardian="+"A"*43})[0] == 401
+          print("PASS: native JSON interface, invalid sessions, cookie isolation and cross-origin rejection")
           PY
