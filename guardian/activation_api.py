@@ -109,6 +109,13 @@ class ActivationAPI:
 
 def create_app():
     store = store_from_environment()
+    encoded = os.environ.get("VOID_GUARDIAN_SIGNING_KEY_B64")
+    if encoded:
+        import base64
+        if len(encoded) > 4096:
+            raise ValueError("Invalid signing key")
+        key = serialization.load_der_private_key(base64.b64decode(encoded, validate=True), password=None)
+        return ActivationAPI(DeviceProtocol(store, key))
     root = pathlib.Path(os.environ["VOID_GUARDIAN_STATE"])
     key_path = root / "signing-key.pem"
     info = key_path.lstat()

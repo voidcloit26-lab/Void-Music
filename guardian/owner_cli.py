@@ -14,7 +14,8 @@ from guardian.access_store import AccessStore, AccessDenied
 
 def store_from_environment():
     os.umask(0o077)
-    root = pathlib.Path(os.environ["VOID_GUARDIAN_STATE"])
+    database_url = os.environ.get("VOID_GUARDIAN_DATABASE_URL")
+    root = pathlib.Path(os.environ.get("VOID_GUARDIAN_STATE", "/tmp/void-guardian-state"))
     if not root.is_absolute():
         raise ValueError("VOID_GUARDIAN_STATE must be absolute")
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -44,6 +45,11 @@ def store_from_environment():
         pepper = bytes.fromhex(raw.decode("ascii").strip())
     else:
         pepper = bytes.fromhex(os.environ["VOID_GUARDIAN_PEPPER"])
+    if database_url:
+        from guardian.postgres_store import PostgresAccessStore
+        return PostgresAccessStore(database_url, pepper)
+    if "VOID_GUARDIAN_STATE" not in os.environ:
+        raise ValueError("SQLite requires explicit persistent VOID_GUARDIAN_STATE")
     return AccessStore(str(path), pepper)
 
 def main():
