@@ -32,11 +32,15 @@ jobs:
           tools = '{http://schemas.android.com/tools}'
           assert manifest.find('application').attrib[ns+'allowBackup'] == 'false'
           assert any(p.attrib.get(ns+'name') == 'android.permission.RECORD_AUDIO' and p.attrib.get(tools+'node') == 'remove' for p in manifest.findall('uses-permission'))
-          methods = re.findall(r'private native \w+ (\w+)\(\);', java)
-          assert len(methods) == 4 and all('Java_online_voidbot_rpcprobe_ProbeActivity_'+m in cpp for m in methods)
+          methods = re.findall(r'private native \w+ (\w+)\([^;]*\);', java)
+          assert len(methods) == 5 and all('Java_online_voidbot_rpcprobe_ProbeActivity_'+m in cpp for m in methods)
           assert '1553388915300245594ULL' in cpp
           assert 'void_music' in cpp and 'https://discord.gg/marscm' in cpp
           assert 'ClearRichPresence' in cpp
+          assert 'MediaBrowser' in java and 'STATE_PLAYING' in java
+          assert 'getTransportControls' not in java and 'NotificationListenerService' not in java
+          assert 'SetEnd' in cpp and 'ActivityTypes::Listening' in cpp
+          assert 'shareArtwork.setChecked(false)' in java
           print('Source checks passed. No SDK, native compilation, APK or device test performed.')
           PY
       - name: Guardian core regression tests
