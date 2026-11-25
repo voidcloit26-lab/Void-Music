@@ -26,7 +26,24 @@ def store_from_environment():
         info = path.lstat()
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) & 0o077:
             raise PermissionError("Unsafe Guardian database permissions")
-    pepper = bytes.fromhex(os.environ["VOID_GUARDIAN_PEPPER"])
+    pepper_file = os.environ.get("VOID_GUARDIAN_PEPPER_FILE")
+    if pepper_file and "VOID_GUARDIAN_PEPPER" in os.environ:
+        raise ValueError("Configure only one pepper source")
+    if pepper_file:
+        secret = pathlib.Path(pepper_file)
+        if not secret.is_absolute():
+            raise ValueError("Pepper path must be absolute")
+        fd = os.open(secret, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(fd, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+                raise PermissionError("Pepper file must be an owner-only regular file (0600)")
+            raw = stream.read(257)
+            if len(raw) > 256:
+                raise ValueError("Pepper file too long")
+        pepper = bytes.fromhex(raw.decode("ascii").strip())
+    else:
+        pepper = bytes.fromhex(os.environ["VOID_GUARDIAN_PEPPER"])
     return AccessStore(str(path), pepper)
 
 def main():
