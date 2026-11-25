@@ -67,10 +67,12 @@ class DiscordAuth @Inject constructor(
     private val _login = MutableStateFlow<DiscordLogin>(DiscordLogin.Idle)
     val login: StateFlow<DiscordLogin> = _login.asStateFlow()
 
-    val isConfigured: Boolean get() = ClientId.isNotBlank()
+    // Legacy direct gateway is deliberately unavailable in this test branch.
+    // The independent native RPC diagnostic does not use account OAuth tokens.
+    val isConfigured: Boolean get() = false
 
     val signedIn: Flow<Boolean> = context.dataStore.data
-        .map { it[DiscordAccessTokenKey] != null }
+        .map { isConfigured && it[DiscordAccessTokenKey] != null }
         .distinctUntilChanged()
 
     val profile: Flow<DiscordProfile?> = context.dataStore.data
@@ -83,6 +85,7 @@ class DiscordAuth @Inject constructor(
      * Android may close Mochy while the browser is in front.
      */
     suspend fun loginUri(): Uri {
+        check(isConfigured) { "Legacy Discord authentication is disabled" }
         val state = Pkce.randomCode(24)
         val verifier = Pkce.randomCode(64)
         context.dataStore.edit {
@@ -108,6 +111,7 @@ class DiscordAuth @Inject constructor(
 
     /** The user came back from the browser, ready or not. */
     suspend fun finish(redirect: Uri) {
+        if (!isConfigured) return
         val prefs = context.dataStore.data.first()
         val expectedState = prefs[DiscordLoginStateKey]
         val verifier = prefs[DiscordLoginVerifierKey]
@@ -168,6 +172,7 @@ class DiscordAuth @Inject constructor(
 
     /** A token that still works, renewed first when it's about to run out. Null when signed out. */
     suspend fun accessToken(): String? {
+        if (!isConfigured) return null
         val prefs = context.dataStore.data.first()
         val token = prefs[DiscordAccessTokenKey] ?: return null
         val expiresAt = prefs[DiscordTokenExpiresAtKey] ?: 0L

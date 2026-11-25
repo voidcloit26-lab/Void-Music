@@ -7,7 +7,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode 1
-        versionName '0.1-local-probe'
+        versionName '0.2-local-probe'
         ndk { abiFilters 'arm64-v8a' }
         externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_shared' } }
     }
@@ -19,5 +19,14 @@ android {
 }
 dependencies { implementation files('libs/discord_partner_sdk.aar') }
 tasks.named('preBuild').configure {
-    doFirst { if (!file('libs/discord_partner_sdk.aar').isFile()) throw new GradleException('Place your authorized SDK release AAR in app/libs before building.') }
+    doFirst { def sdk = file('libs/discord_partner_sdk.aar')
+        if (!sdk.isFile()) throw new GradleException('Place your authorized SDK release AAR in app/libs before building.')
+        def hash = java.security.MessageDigest.getInstance('SHA-256')
+        sdk.withInputStream { stream ->
+            byte[] buffer = new byte[65536]
+            int n
+            while ((n = stream.read(buffer)) > 0) hash.update(buffer, 0, n)
+        }
+        if (hash.digest().encodeHex().toString() != 'ea4c080cc7c5ddeccab58f3bdf5682a3e18a7a84a815bb0f33609bfcafba3f99')
+            throw new GradleException('Unexpected Discord SDK binary; use the verified 1.11.24259 release AAR.') }
 }

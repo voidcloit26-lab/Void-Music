@@ -124,28 +124,24 @@ fun DiscordScreen(
             title = stringResource(R.string.discord_settings_title),
             onBack = { navController.navigateUp() },
         ) {
-            IntegrationPageSubtitle(stringResource(R.string.discord_subtitle_rich_presence))
+            IntegrationPageSubtitle("Discord Rich Presence · native RPC testing")
             DiscordToggleCard(
-                checked = settings.enabled,
-                onCheckedChange = { on -> viewModel.edit { copy(enabled = on) } },
-                status = statusLine(context, viewModel.isConfigured, signedIn, settings.enabled, connection, login),
-                enabled = signedIn,
+                checked = false,
+                onCheckedChange = {},
+                status = "Native connection not available in this build. No separate Discord login is required for the planned connection.",
+                enabled = false,
             )
             Spacer(Modifier.height(12.dp))
+            DiscordNoticeCard("Activity preview only. Sign in to the official Discord Android app and enable activity sharing. This build does not publish any activity.")
+            Spacer(Modifier.height(12.dp))
             DiscordProfileCard(
-                profile = profile.takeIf { signedIn },
+                profile = null,
                 track = track,
                 settings = settings,
                 modifier = Modifier.onGloballyPositioned { previewBottomPx = it.boundsInWindow().bottom },
             )
             Spacer(Modifier.height(12.dp))
-            AccountButton(
-                configured = viewModel.isConfigured,
-                signedIn = signedIn,
-                login = login,
-                onLogin = ::openLogin,
-                onLogOut = viewModel::logOut,
-            )
+            DiscordNoticeCard("VOID RPC is being tested independently. Never enter your Discord token or password into a third-party music app.")
             CustomizeSection(
                 settings = settings,
                 edit = viewModel::edit,

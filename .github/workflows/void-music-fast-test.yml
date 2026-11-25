@@ -1,8 +1,8 @@
 name: VOID Music Fast Android Test
-# Build the updated legal notices and About layout; can also be run manually.
+# Build isolated Android test variants. Does not embed the proprietary Discord SDK.
 on:
   push:
-    branches: [feat/void-music-branding-20261124]
+    branches: [feat/void-music-branding-20261124, test]
     paths:
       - '.github/workflows/void-music-fast-test.yml'
   workflow_dispatch:
