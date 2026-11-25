@@ -47,6 +47,7 @@ import kotlin.system.exitProcess
 // the big-screen app: launched from the tv's home screen, everything inside it is laid out for a remote
 @AndroidEntryPoint
 class TvActivity : ComponentActivity() {
+    private var guardianBlocked = false
     @Inject lateinit var database: MusicDatabase
     @Inject lateinit var downloadUtil: DownloadUtil
     @Inject lateinit var syncUtils: SyncUtils
@@ -76,6 +77,8 @@ class TvActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        guardianBlocked = com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this)
+        if (guardianBlocked) return
         // the phone's launch intro never plays here; work that waits for it (the youtube token) starts now
         LaunchGate.skip()
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -119,12 +122,14 @@ class TvActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (guardianBlocked) return
         playerConnection?.isUiVisible?.value = true
         bindService(Intent(this, MusicService::class.java), serviceConnection, BIND_AUTO_CREATE)
         if (profileOpen) phoneSync.resume()
     }
 
     override fun onStop() {
+        if (guardianBlocked) { super.onStop(); return }
         playerConnection?.isUiVisible?.value = false
         unbindService(serviceConnection)
         phoneSync.pause()
@@ -133,6 +138,7 @@ class TvActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (guardianBlocked) return
         LinkPlayer.release(playerConnection)
         TvControl.onSyncRequest = null
         TvControl.stop()

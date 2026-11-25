@@ -813,8 +813,15 @@ class MusicService :
         }
     }
 
+    private var guardianBlocked = false
+
     override fun onCreate() {
         super.onCreate()
+        guardianBlocked = !com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(this)
+        if (guardianBlocked) {
+            stopSelf()
+            return
+        }
         isRunning = true
 
         playerInitialized.value = false
@@ -4610,6 +4617,7 @@ class MusicService :
     }
 
     override fun onDestroy() {
+        if (guardianBlocked) { super.onDestroy(); return }
         isRunning = false
         unregisterMemoryTrim?.invoke()
         unregisterMemoryTrim = null
@@ -4668,9 +4676,11 @@ class MusicService :
         super.onDestroy()
     }
 
-    override fun onBind(intent: Intent?) = super.onBind(intent) ?: binder
+    override fun onBind(intent: Intent?): android.os.IBinder? =
+        if (guardianBlocked || !com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(this)) null else super.onBind(intent) ?: binder
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        if (guardianBlocked) { super.onTaskRemoved(rootIntent); return }
         if (dataStore.get(StopPlaybackOnTaskRemovedKey, false)) {
             player.stop()
             stopSelf()
@@ -4682,9 +4692,14 @@ class MusicService :
     private fun sessionPlayer(base: ExoPlayer): CarLyricsPlayer =
         CarLyricsPlayer(TransportFadingPlayer(base, transport, audioPass)).also { carLyrics?.attach(it) }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? =
+        if (guardianBlocked || !com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(this) || !::mediaSession.isInitialized) null else mediaSession
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (guardianBlocked || !com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(this)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         when (intent?.action) {
             MusicWidgetReceiver.ACTION_PLAY_PAUSE -> {
                 if (player.isPlaying) player.pause() else player.play()

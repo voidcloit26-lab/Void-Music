@@ -23,6 +23,7 @@ import com.mochyy.mochymusic.playback.MusicService
 class VoicePlayActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(this)) { finish(); return }
         val query = intent?.getStringExtra(SearchManager.QUERY)?.trim().orEmpty()
         VoiceHandoff.send(applicationContext, query, VoiceSearch.extrasOf(intent?.extras))
         finish()

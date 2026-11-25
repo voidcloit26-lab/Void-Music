@@ -266,6 +266,7 @@ internal fun markOnboardedOnThisInstall(context: android.content.Context) {
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private var guardianBlocked = false
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(com.mochyy.mochymusic.i18n.AppLanguage.wrapActivityContext(newBase))
     }
@@ -349,6 +350,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (guardianBlocked) return
         playerConnection?.isUiVisible?.value = true
         // paired phones are checked on only when at least one device is paired, keeping PhoneLinkHost lazy otherwise
         if (!isTelevision() && com.mochyy.mochymusic.link.phone.PhoneLinkHost.hasPairedDevices(this)) {
@@ -369,6 +371,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        if (guardianBlocked) { super.onStop(); return }
         playerConnection?.isUiVisible?.value = false
         if (!isTelevision() && com.mochyy.mochymusic.link.phone.PhoneLinkHost.hasPairedDevices(this)) {
             phoneLink.get().appHidden()
@@ -382,6 +385,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (guardianBlocked) return
         systemScaleObserver?.let { contentResolver.unregisterContentObserver(it) }
         systemScaleObserver = null
         if (dataStore.get(StopMusicOnTaskClearKey, false) &&
@@ -412,6 +416,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (guardianBlocked) return
         if (intent.action == com.mochyy.mochymusic.ui.screens.update.ActionOpenUpdate) {
             openUpdateRequests++
             return
@@ -428,6 +433,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen().handOffToLaunchIntro { introPlays }
         super.onCreate(savedInstanceState)
+        guardianBlocked = com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this)
+        if (guardianBlocked) return
         // a tv that opens the phone app from an old shortcut gets the big-screen one instead
         if (savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && isTelevision()) {
             startActivity(Intent(this, com.mochyy.mochymusic.ui.tv.TvActivity::class.java))

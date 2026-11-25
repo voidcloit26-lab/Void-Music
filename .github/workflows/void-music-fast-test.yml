@@ -5,6 +5,7 @@ on:
     branches: [feat/void-music-branding-20261124, test]
     paths:
       - '.github/workflows/void-music-fast-test.yml'
+      - 'app/src/main/kotlin/com/mochyy/mochymusic/guardian/**'
   workflow_dispatch:
 
 permissions:

@@ -130,6 +130,22 @@ extensions.configure<ApplicationExtension> {
         // Public identifier for the supported native Rich Presence integration.
         // Keep the legacy gateway configuration separate until its replacement is verified.
         buildConfigField("String", "VOID_DISCORD_APPLICATION_ID", "\"1553388915300245594\"")
+
+        // Development opt-in: never point an enforced build at an arbitrary runtime origin.
+        val guardianEnforced = (localProperties.getProperty("VOID_GUARDIAN_ENFORCED")
+            ?: System.getenv("VOID_GUARDIAN_ENFORCED") ?: "false") == "true"
+        val guardianOrigin = localProperties.getProperty("VOID_GUARDIAN_ORIGIN")
+            ?: System.getenv("VOID_GUARDIAN_ORIGIN") ?: ""
+        val guardianPublicKey = localProperties.getProperty("VOID_GUARDIAN_PUBLIC_KEY")
+            ?: System.getenv("VOID_GUARDIAN_PUBLIC_KEY") ?: ""
+        require(guardianOrigin.isEmpty() || guardianOrigin.matches(Regex("https://[A-Za-z0-9.-]+/?")))
+        require(guardianPublicKey.isEmpty() || guardianPublicKey.matches(Regex("[A-Za-z0-9_-]{1,256}")))
+        require(!guardianEnforced || (guardianOrigin.isNotEmpty() && guardianPublicKey.isNotEmpty())) {
+            "Guardian enforced builds require an HTTPS origin and pinned public signing key"
+        }
+        buildConfigField("Boolean", "VOID_GUARDIAN_ENFORCED", guardianEnforced.toString())
+        buildConfigField("String", "VOID_GUARDIAN_ORIGIN", "\"$guardianOrigin\"")
+        buildConfigField("String", "VOID_GUARDIAN_PUBLIC_KEY", "\"$guardianPublicKey\"")
         val discordClientId = localProperties.getProperty("DISCORD_CLIENT_ID")
             ?: System.getenv("DISCORD_CLIENT_ID") ?: ""
         buildConfigField("String", "DISCORD_CLIENT_ID", "\"$discordClientId\"")
