@@ -7,6 +7,7 @@ waking the database on every platform probe.
 """
 import base64
 import hmac
+import hashlib
 import os
 import logging
 import psycopg
@@ -92,4 +93,9 @@ def create_app():
     except Exception as exc:
         logging.getLogger(__name__).error('Guardian startup category: %s', database_failure_category(exc))
         raise RuntimeError("Guardian database initialization failed; check dedicated database configuration") from None
+    public_der = key.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    # Public-key fingerprint only, never private material or environment values.
+    logging.getLogger("gunicorn.error").info(
+        "Guardian active signing public-key SHA256: %s", hashlib.sha256(public_der).hexdigest())
     return ManagedApplication(ActivationAPI(DeviceProtocol(store, key)))

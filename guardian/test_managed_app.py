@@ -45,6 +45,17 @@ class ManagedAppTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "^Guardian database initialization failed;"):
                     create_app()
 
+    def test_startup_fingerprint_only(self):
+        import hashlib
+        public_der = base64.urlsafe_b64decode(self.env["VOID_GUARDIAN_PUBLIC_KEY"] + "=" * (-len(self.env["VOID_GUARDIAN_PUBLIC_KEY"]) % 4))
+        with patch.dict("os.environ", self.env, clear=True):
+            with patch("guardian.managed_app.PostgresAccessStore"):
+                with self.assertLogs("gunicorn.error", level="INFO") as logs:
+                    create_app()
+        self.assertIn(hashlib.sha256(public_der).hexdigest(), " ".join(logs.output))
+        self.assertNotIn(self.env["VOID_GUARDIAN_SIGNING_KEY_B64"], " ".join(logs.output))
+        self.assertNotIn(self.env["VOID_GUARDIAN_PEPPER"], " ".join(logs.output))
+
     def test_readiness_has_no_owner_routes_or_secret_data(self):
         def fake_api(env, start):
             start("404 Not Found", [])
