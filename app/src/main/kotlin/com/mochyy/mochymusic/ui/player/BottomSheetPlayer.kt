@@ -1783,6 +1783,17 @@ private fun PlayerSheet(
                 )
             }
 
+            // A small independent shortcut in the unused portrait header space.
+            // No changes to the existing transport, deck, gestures or DSP.
+            if (!onTv && isFlagship && screenWidth >= 320.dp && state.isExpanded &&
+                !studioEngaged && !lyricsMounted && !showExpandMenu && !showActionMenu) {
+                AudioLabShortcut(
+                    onClick = openEqualizer,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                        .padding(top = statusBarTopInset + 2.dp, end = 12.dp),
+                )
+            }
+
             // the editor's tiles: inside the sheet, so they shrink and grow with it
             EditTiles(studioParts)
 
