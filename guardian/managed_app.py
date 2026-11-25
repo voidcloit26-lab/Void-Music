@@ -64,6 +64,12 @@ def database_failure_category(exc):
         return "connection_config"
     if isinstance(exc, psycopg.OperationalError):
         message = str(exc).lower()
+        if "does not match host" in message or "hostname mismatch" in message:
+            return "tls_hostname"
+        if "root certificate" in message and ("missing" in message or "does not exist" in message or "could not open" in message):
+            return "tls_ca_missing"
+        if "certificate verify failed" in message or "certificate verification failed" in message:
+            return "tls_chain"
         if "certificate" in message or "sslrootcert" in message or "ssl error" in message:
             return "tls_certificate"
         if "authentication" in message or "password" in message:

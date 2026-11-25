@@ -67,10 +67,13 @@ class PostgresAccessStore(AccessStore):
             if settings.get("host") not in ("127.0.0.1", "localhost"):
                 raise ValueError("Local test database only")
         else:
-            # libpq's default ~/.postgresql/root.crt is absent on managed hosts.
-            # Use the host trust store explicitly; never fall back to sslmode=require.
-            if not settings.get('sslrootcert'):
-                self.tls_options['sslrootcert'] = 'system'
+            # Binary libpq can resolve system OpenSSL trust paths differently
+            # from the host runtime. Managed Neon uses the packaged Mozilla CA
+            # bundle explicitly, including when the URL specifies "system".
+            # Preserve explicitly configured custom CA files for other adapters.
+            if not initialize_schema or not settings.get('sslrootcert') or settings.get('sslrootcert') == 'system':
+                import certifi
+                self.tls_options['sslrootcert'] = certifi.where()
             if settings.get("sslmode") != "verify-full":
                 raise ValueError("Guardian PostgreSQL requires sslmode=verify-full")
             if not settings.get("host") or not settings.get("dbname") or not settings.get("user"):

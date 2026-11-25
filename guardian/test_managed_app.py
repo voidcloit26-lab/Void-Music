@@ -63,7 +63,25 @@ class ManagedAppTests(unittest.TestCase):
     def test_diagnostics_do_not_include_secret(self):
         import psycopg
         from guardian.managed_app import database_failure_category
-        self.assertEqual(database_failure_category(psycopg.OperationalError("root certificate missing SECRET")), "tls_certificate")
+        self.assertEqual(database_failure_category(psycopg.OperationalError("root certificate missing SECRET")), "tls_ca_missing")
         self.assertEqual(database_failure_category(psycopg.OperationalError("password authentication failed SECRET")), "authentication")
         self.assertEqual(database_failure_category(RuntimeError("SECRET")), "unexpected")
         self.assertEqual(database_failure_category(PermissionError("SECRET")), "runtime_grants")
+
+    def test_managed_tls_uses_explicit_bundle_and_rejects_weak_mode(self):
+        import certifi
+        from pathlib import Path
+        from guardian.postgres_store import PostgresAccessStore
+        url = "postgresql://guardian_runtime:ci-only@db.example/void_guardian?sslmode=verify-full&sslrootcert=system"
+        with patch("guardian.access_store.AccessStore.__init__", return_value=None):
+            store = PostgresAccessStore(url, b"p"*32, initialize_schema=False)
+            self.assertEqual(store.tls_options["sslrootcert"], certifi.where())
+            self.assertTrue(Path(certifi.where()).is_file())
+            with self.assertRaises(ValueError):
+                PostgresAccessStore(url.replace("verify-full", "require"), b"p"*32, initialize_schema=False)
+
+    def test_safe_tls_diagnostic_subcategories(self):
+        import psycopg
+        from guardian.managed_app import database_failure_category
+        self.assertEqual(database_failure_category(psycopg.OperationalError("certificate verify failed SECRET")), "tls_chain")
+        self.assertEqual(database_failure_category(psycopg.OperationalError("server certificate does not match host SECRET")), "tls_hostname")
