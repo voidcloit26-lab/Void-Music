@@ -1,0 +1,98 @@
+name: VOID Music combined Guardian and native RPC compile (private)
+on:
+  push:
+    branches: [test]
+    paths:
+      - '.github/workflows/void-music-combined-native-private.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: void-music-combined-native-private
+  cancel-in-progress: false
+jobs:
+  private-compile:
+    if: github.ref == 'refs/heads/test' && vars.VOID_RPC_SDK_TEST_APPROVED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VOID_GUARDIAN_ENFORCED: 'true'
+      VOID_GUARDIAN_ORIGIN: https://void-guardian-staging.onrender.com
+      VOID_GUARDIAN_PUBLIC_KEY: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBuqQpt9NvZOua1--_997L_zDV1uvgEEhXXBSDc_cp2dCZ90AUycBvuTrIhDsEvue4PvkrQj5dwLFCmPpOkzVew
+      VOID_NATIVE_RPC_AUTHORIZED_PRIVATE_TEST: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/void_brand_audit.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Prepare verified Android toolchain and private SDK
+        env:
+          SDK_URL: ${{ secrets.VOID_RPC_SDK_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$SDK_URL" || { echo 'Private authorized SDK URL is not configured'; exit 1; }
+          sdkmanager 'platforms;android-37' 'ndk;27.0.12077973' 'cmake;3.22.1'
+          mkdir -p "$RUNNER_TEMP/void-native-sdk"
+          sdk="$RUNNER_TEMP/void-native-sdk/discord_partner_sdk.aar"
+          curl --fail --silent --show-error --proto '=https' --max-time 120 --output "$sdk" "$SDK_URL"
+          echo "ea4c080cc7c5ddeccab58f3bdf5682a3e18a7a84a815bb0f33609bfcafba3f99  $sdk" | sha256sum -c -
+          echo "VOID_NATIVE_RPC_AAR=$sdk" >> "$GITHUB_ENV"
+      - name: Compile both Guardian and native RPC into one private APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset STORE_PASSWORD KEY_ALIAS KEY_PASSWORD
+          export CMAKE_BUILD_PARALLEL_LEVEL=1
+          mkdir -p "$HOME/.android"
+          if [ ! -e "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=VOID Combined Private Test'
+          fi
+          chmod +x gradlew
+          ./gradlew --no-daemon --console=plain --no-configuration-cache --max-workers=1 :app:assembleArm64GmsFast
+      - name: Verify combined configuration, signature, and native libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re
+          from pathlib import Path
+          c=[p for p in Path("app/build/generated").rglob("BuildConfig.java") if "VOID_GUARDIAN_ENFORCED" in p.read_text()]
+          assert len(c)==1,c
+          cfg=c[0].read_text()
+          for field in ("VOID_GUARDIAN_ENFORCED","VOID_NATIVE_RPC_INCLUDED"):
+              assert re.search(r"\b"+field+r"\s*=\s*true\s*;",cfg),field
+          for field in ("VOID_GUARDIAN_ORIGIN","VOID_GUARDIAN_PUBLIC_KEY"):
+              assert re.search(r"\b"+field+r'\s*=\s*"'+re.escape(os.environ[field])+r'"\s*;',cfg),field
+          PY
+          mapfile -t apks < <(find app/build/outputs/apk/arm64Gms/fast -maxdepth 1 -type f -name '*.apk')
+          test "${#apks[@]}" -eq 1
+          apk="${apks[0]}"
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n1)
+          "$signer" verify --verbose "$apk"
+          "$(dirname "$signer")/aapt" dump badging "$apk" > combined-badging.txt
+          grep -F "package: name='online.voidbot.music.fast'" combined-badging.txt
+          if grep -q 'application-debuggable' combined-badging.txt; then exit 1; fi
+          "$(dirname "$signer")/aapt" dump permissions "$apk" > combined-permissions.txt
+          if grep -q 'FOREGROUND_SERVICE_MICROPHONE' combined-permissions.txt; then exit 1; fi
+          unzip -Z1 "$apk" > combined-files.txt
+          grep -Fxq 'lib/arm64-v8a/libvoid_music_rpc.so' combined-files.txt
+          grep -Fxq 'lib/arm64-v8a/libdiscord_partner_sdk.so' combined-files.txt
+          printf '%s\n' 'PASS: Guardian and native RPC compiled together. Private test only; runtime and licensing gates pending.' > combined-status.txt
+          git rev-parse HEAD >> combined-status.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: void-combined-private-build-report-only
+          path: |
+            combined-badging.txt
+            combined-permissions.txt
+            combined-status.txt
+          retention-days: 3
+          if-no-files-found: error
+      - name: Remove private SDK and build outputs
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/void-native-sdk" app/build/outputs/apk
