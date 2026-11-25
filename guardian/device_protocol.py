@@ -53,6 +53,9 @@ def proof_message(nonce, fingerprint, action, code=""):
     digest = hashlib.sha256(code.encode("ascii")).hexdigest()
     return ("VOID-DEVICE-PROOF-v1\n" + nonce + "\n" + fingerprint + "\n" + action + "\n" + digest).encode("ascii")
 
+class AccessInactive(AccessDenied):
+    """A verified device does not have an active entitlement."""
+
 class DeviceProtocol:
     def __init__(self, store, signing_key, clock=time.monotonic, max_challenges=1024):
         if not isinstance(signing_key, ec.EllipticCurvePrivateKey) or not isinstance(signing_key.curve, ec.SECP256R1):
@@ -108,7 +111,7 @@ class DeviceProtocol:
         device = self._verify(public_key, nonce, signature, "status", "")
         account = device_account(device)
         if not self.store.is_active(account, device):
-            raise AccessDenied("access not active")
+            raise AccessInactive("access not active")
         return self._entitlement(account, device)
 
     def _entitlement(self, account, device):
