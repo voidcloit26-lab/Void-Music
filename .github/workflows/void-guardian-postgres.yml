@@ -1,0 +1,38 @@
+name: VOID Guardian PostgreSQL Test
+on:
+  push:
+    branches: [test]
+    paths:
+      - 'guardian/**'
+      - '.github/workflows/void-guardian-postgres.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: guardian_test
+          POSTGRES_PASSWORD: ci-only-guardian-test
+          POSTGRES_DB: void_guardian_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U guardian_test -d void_guardian_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r guardian/requirements-server.txt
+      - name: Run isolated PostgreSQL integration checks
+        env:
+          VOID_GUARDIAN_POSTGRES_TEST_URL: postgresql://guardian_test:ci-only-guardian-test@127.0.0.1:5432/void_guardian_test?sslmode=disable
+        run: python -m unittest guardian.test_postgres_store -v
