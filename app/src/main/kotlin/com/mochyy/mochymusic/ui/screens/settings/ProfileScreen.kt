@@ -808,11 +808,6 @@ fun ProfileScreen(navController: NavController) {
                             },
                         )
                         Spacer(Modifier.height(16.dp))
-                        DeveloperCard(onClick = { navController.navigate("developer_space") })
-                        Spacer(Modifier.height(16.dp))
-                        DiscordCard(onClick = { context.openDevUrl(DiscordUrl) })
-                        Spacer(Modifier.height(8.dp))
-                        DiscordCard(label = "Contact VOID · Owner", onClick = { context.openDevUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
                         Spacer(Modifier.height(28.dp))
                         Text(stringResource(R.string.profile_settings_title), style = PageTitle.copy(fontSize = 15.sp), modifier = Modifier.padding(start = 2.dp, bottom = 10.dp))
                         OpenSettingsRow(onClick = { navController.navigate("mochy_settings") })

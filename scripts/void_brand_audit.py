@@ -97,13 +97,23 @@ check_file(src + "discord/DiscordPresence.kt", "PresencePicture.Logo -> emptyLis
 if (ROOT / ".github/FUNDING.yml").exists():
     errors.append("Upstream funding configuration present")
 
-check_file(src + "ui/screens/settings/integrations/IntegrationsScreen.kt", "context.openDevUrl(OwnerDiscordUrl)", "Owner contact in integrations")
-check_file(src + "ui/screens/settings/ProfileScreen.kt", 'label = "Contact VOID · Owner"', "Owner contact in profile")
 for helper in ("ui/screens/update/UpdateSheet.kt", "ui/screens/settings/devspace/DevStyle.kt"):
     check_file(src + helper, 'host.endsWith(".github.com")', "Block repository redirects")
 about = (ROOT / (src + "ui/screens/update/AboutSheet.kt")).read_text(encoding="utf-8")
 if "fetchContributors(" in about or re.search(r'https://github\\.com/[^"]+/LICENSE', about):
     errors.append("Legacy contributor lookup or repository license redirect")
+
+if "https://github.com/" in about or "githubUser:" in about:
+    errors.append("Unexpected GitHub profile/repository metadata in About")
+for relative, forbidden in {
+    "ui/screens/settings/ProfileScreen.kt": ('DeveloperCard(onClick = { navController.navigate("developer_space") })', 'DiscordCard(onClick = { context.openDevUrl(DiscordUrl) })'),
+    "ui/screens/settings/integrations/IntegrationsScreen.kt": ('IntegrationPageSubtitle("VOID Community")',),
+}.items():
+    for token in forbidden:
+        if token in (ROOT / (src + relative)).read_text(encoding="utf-8"):
+            errors.append(f"Promotional navigation in {relative}: {token}")
+check_file(src + "ui/screens/update/AboutSheet.kt", "View copyright & licenses", "Accessible legal attribution")
+check_file(src + "guardian/GuardianActivationActivity.kt", "Legal & Privacy", "Pre-activation privacy notice")
 
 print("VOID Music branding audit")
 print(f"English resource checks: {len(list(english.glob('*.xml')))} files")
@@ -113,7 +123,3 @@ for error in errors:
     print("ERROR:", error)
 print(f"Result: {len(errors)} error(s), {len(warnings)} notice(s)")
 sys.exit(1 if errors else 0)
-
-# Legal notices remain; contributor repository/profile URLs must not be bundled in About.
-if "https://github.com/" in about or "githubUser:" in about:
-    raise SystemExit("Unexpected GitHub profile/repository metadata in About")

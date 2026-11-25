@@ -218,7 +218,6 @@ private fun ColumnScope.AboutSheetContent(
     popup: PopupSheetState,
     onOpenDevSpace: (Int) -> Unit,
 ) {
-    val context = LocalContext.current
     val installed = shortVersion(BuildConfig.VERSION_NAME)
     val scrollState = rememberScrollState()
     val ringScrollRangePx = with(LocalDensity.current) { 180.dp.toPx() }
@@ -313,43 +312,10 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
-            SectionHeader("Community & contact")
-            Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AboutPillRow(
-                    text = "Join MARS Community",
-                    onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.DiscordUrl) },
-                )
-                AboutPillRow(
-                    text = "Contact VOID · Owner",
-                    onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) },
-                )
-
-            }
-
-            Spacer(Modifier.height(18.dp))
-            SectionHeader("Meet the maintainer")
-            Spacer(Modifier.height(8.dp))
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MenuRowSurface)
-                        .padding(vertical = 6.dp),
-            ) {
-                LeadDevs.forEach { dev ->
-                    PersonRow(
-                        name = dev.name,
-                        subtitle = "Founder / Owner",
-                        avatarUrl = "",
-                        fallbackRes = dev.fallbackAvatar,
-                        showArrow = true,
-                        onClick = { onOpenDevSpace(dev.devSpaceIndex) },
-                    )
-                }
-            }
-
+            AboutPillRow(
+                text = "Legal & Policies",
+                onClick = { popup.showLegalNoticesSheet() },
+            )
             Spacer(Modifier.height(8.dp))
         }
     }
@@ -365,8 +331,16 @@ private fun ColumnScope.LegalNoticesContent() {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Legal & open-source notices", fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+        Text("Legal & Policies", fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+        Text("Last updated: 25 November 2026", fontSize = 12.sp)
+        VoidPolicies.sections.forEach { (title, body) ->
+            SectionHeader(title)
+            Text(body, fontSize = 14.sp, lineHeight = 21.sp)
+        }
         Text("VOID Music is a modified open-source project. Original copyrights remain with their respective authors.", fontSize = 13.sp)
+        var noticesExpanded by remember { mutableStateOf(false) }
+        AboutPillRow(text = if (noticesExpanded) "Hide copyright & licenses" else "View copyright & licenses", onClick = { noticesExpanded = !noticesExpanded })
+        if (noticesExpanded) {
         SectionHeader("Copyright & attribution")
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MenuRowSurface).padding(12.dp),
@@ -381,7 +355,8 @@ private fun ColumnScope.LegalNoticesContent() {
             AboutPillRow(text = entry.tag + " · " + entry.title.substringBefore(" · "), onClick = { context.openUrl(entry.url) })
             Text(entry.subtitle, fontSize = 12.sp)
         }
-        Text("Corresponding GPL source and build instructions are supplied to APK recipients by VOID. Original copyright and license notices remain in the source distribution.", fontSize = 13.sp)
+        Text("Recipients must receive corresponding source and build instructions as required by the applicable license. Original copyright and license notices remain in the source distribution.", fontSize = 13.sp)
+        }
         AboutPillRow(text = "Contact VOID", onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
         Spacer(Modifier.height(12.dp))
     }

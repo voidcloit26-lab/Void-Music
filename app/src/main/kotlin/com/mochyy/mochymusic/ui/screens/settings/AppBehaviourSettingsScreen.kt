@@ -88,9 +88,9 @@ private fun legalItems(): List<SettingsItem> {
     val overlay = LocalZoomOutOverlayState.current
     return listOf(
         SettingsItem(
-            title = { Text("Legal & open-source notices") },
-            highlightKey = "Legal & open-source notices",
-            searchText = "Legal credits license copyright source notices",
+            title = { Text("Legal & Policies") },
+            highlightKey = "Legal & Policies",
+            searchText = "Legal terms privacy policies credits license copyright source notices",
             descriptionText = "Software licenses and attribution",
             icon = painterResource(R.drawable.info),
             iconShape = CircleShape,

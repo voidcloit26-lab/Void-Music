@@ -58,6 +58,15 @@ class GuardianActivationActivity : ComponentActivity() {
         val restore = Button(this).apply { text = "Check existing activation" }
         root.addView(activate, LinearLayout.LayoutParams(-1, -2))
         root.addView(restore, LinearLayout.LayoutParams(-1, -2))
+        val legal = Button(this).apply { text = "Legal & Privacy" }
+        root.addView(legal, LinearLayout.LayoutParams(-1, -2))
+        legal.setOnClickListener {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("VOID Music · Legal & Privacy")
+                .setMessage(com.mochyy.mochymusic.ui.screens.update.VoidPolicies.fullText())
+                .setPositiveButton("Close", null)
+                .show()
+        }
         val status = text("", 15f)
         setContentView(ScrollView(this).apply {
             setBackgroundColor(Color.rgb(15, 15, 20))
