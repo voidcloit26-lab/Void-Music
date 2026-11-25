@@ -60,12 +60,17 @@ class _Transaction:
 class PostgresAccessStore(AccessStore):
     def __init__(self, database_url, pepper, *, allow_local_test=False, initialize_schema=True):
         self.initialize_schema = initialize_schema
+        self.tls_options = {}
         from psycopg.conninfo import conninfo_to_dict
         settings = conninfo_to_dict(database_url)
         if allow_local_test:
             if settings.get("host") not in ("127.0.0.1", "localhost"):
                 raise ValueError("Local test database only")
         else:
+            # libpq's default ~/.postgresql/root.crt is absent on managed hosts.
+            # Use the host trust store explicitly; never fall back to sslmode=require.
+            if not settings.get('sslrootcert'):
+                self.tls_options['sslrootcert'] = 'system'
             if settings.get("sslmode") != "verify-full":
                 raise ValueError("Guardian PostgreSQL requires sslmode=verify-full")
             if not settings.get("host") or not settings.get("dbname") or not settings.get("user"):
@@ -79,7 +84,7 @@ class PostgresAccessStore(AccessStore):
         # Connection context commits or rolls back, then closes. Explicit
         # READ COMMITTED plus transaction lock preserves the serial core.
         with connect(self.database, connect_timeout=8,
-                     application_name="void-guardian") as conn:
+                     application_name="void-guardian", **self.tls_options) as conn:
             with conn.transaction():
                 conn.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
                 conn.execute("SET LOCAL lock_timeout = '8s'")

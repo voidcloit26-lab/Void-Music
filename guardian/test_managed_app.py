@@ -59,3 +59,11 @@ class ManagedAppTests(unittest.TestCase):
         self.assertEqual(call("/healthz", "POST")[0], "405 Method Not Allowed")
         self.assertEqual(call("/healthz", query="x=1")[0], "404 Not Found")
         self.assertEqual(call("/owner")[0], "404 Not Found")
+
+    def test_diagnostics_do_not_include_secret(self):
+        import psycopg
+        from guardian.managed_app import database_failure_category
+        self.assertEqual(database_failure_category(psycopg.OperationalError("root certificate missing SECRET")), "tls_certificate")
+        self.assertEqual(database_failure_category(psycopg.OperationalError("password authentication failed SECRET")), "authentication")
+        self.assertEqual(database_failure_category(RuntimeError("SECRET")), "unexpected")
+        self.assertEqual(database_failure_category(PermissionError("SECRET")), "runtime_grants")

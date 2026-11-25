@@ -8,6 +8,8 @@ waking the database on every platform probe.
 import base64
 import hmac
 import os
+import logging
+import psycopg
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from guardian.activation_api import ActivationAPI
@@ -53,12 +55,35 @@ class ManagedApplication:
             return ActivationAPI.respond(start, "405 Method Not Allowed", {"error": "method_not_allowed"})
         return self.api(env, start)
 
+def database_failure_category(exc):
+    # Closed vocabulary only: never emit connection strings, passwords, exception
+    # repr, or raw provider error details in platform logs.
+    if isinstance(exc, PermissionError):
+        return "runtime_grants"
+    if isinstance(exc, ValueError):
+        return "connection_config"
+    if isinstance(exc, psycopg.OperationalError):
+        message = str(exc).lower()
+        if "certificate" in message or "sslrootcert" in message or "ssl error" in message:
+            return "tls_certificate"
+        if "authentication" in message or "password" in message:
+            return "authentication"
+        if "timeout" in message or "timed out" in message:
+            return "connect_timeout"
+        if "translate host" in message or "name resolution" in message:
+            return "dns"
+        return "database_connection"
+    if isinstance(exc, psycopg.Error):
+        return "database_sql"
+    return "unexpected"
+
 def create_app():
     url, pepper, key = config(os.environ)
     # The PostgreSQL adapter requires verified TLS and initializes the dedicated schema.
     # No application instance is returned when initialization fails.
     try:
         store = PostgresAccessStore(url, pepper, initialize_schema=False)
-    except Exception:
+    except Exception as exc:
+        logging.getLogger(__name__).error('Guardian startup category: %s', database_failure_category(exc))
         raise RuntimeError("Guardian database initialization failed; check dedicated database configuration") from None
     return ManagedApplication(ActivationAPI(DeviceProtocol(store, key)))
