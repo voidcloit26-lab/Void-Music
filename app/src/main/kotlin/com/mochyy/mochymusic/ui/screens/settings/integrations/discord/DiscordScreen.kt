@@ -124,15 +124,36 @@ fun DiscordScreen(
             title = stringResource(R.string.discord_settings_title),
             onBack = { navController.navigateUp() },
         ) {
-            IntegrationPageSubtitle("Discord Rich Presence · native RPC testing")
+            val nativeIncluded = com.mochyy.mochymusic.discord.NativePresenceBridge.included
+            val nativeReady by com.mochyy.mochymusic.discord.NativePresenceBridge.ready.collectAsState()
+            IntegrationPageSubtitle("Discord Rich Presence")
             DiscordToggleCard(
-                checked = false,
-                onCheckedChange = {},
-                status = "Native connection not available in this build. No separate Discord login is required for the planned connection.",
-                enabled = false,
+                checked = nativeIncluded && settings.enabled,
+                onCheckedChange = { on -> viewModel.edit { copy(enabled = on) } },
+                status = when {
+                    !nativeIncluded -> "Native connection not included in this build"
+                    !nativeReady -> "Native connection unavailable; reopen VOID Music"
+                    !settings.enabled -> "Activity sharing off"
+                    connection == PresenceConnection.Live -> "Discord accepted activity update"
+                    connection == PresenceConnection.Connecting -> "Updating Discord activity"
+                    connection == PresenceConnection.Retrying -> "Discord unavailable; retrying"
+                    else -> "Waiting for playback"
+                },
+                enabled = nativeIncluded && nativeReady,
             )
             Spacer(Modifier.height(12.dp))
-            DiscordNoticeCard("Activity preview only. Sign in to the official Discord Android app and enable activity sharing. This build does not publish any activity.")
+            DiscordNoticeCard(if (nativeIncluded)
+                "Sign in to the official Discord app and enable activity sharing. This optional feature sends your selected music activity to Discord."
+                else "Activity preview only in this build. No activity is published.")
+            if (nativeIncluded) {
+                Spacer(Modifier.height(12.dp))
+                DiscordSwitchCard(
+                    title = "Share public artwork",
+                    description = "Allow public album and artist image URLs to be sent to Discord. Local pictures are never uploaded.",
+                    checked = settings.sharePublicArtwork,
+                    onCheckedChange = { on -> viewModel.edit { copy(sharePublicArtwork = on) } },
+                )
+            }
             Spacer(Modifier.height(12.dp))
             DiscordProfileCard(
                 profile = null,
@@ -141,7 +162,7 @@ fun DiscordScreen(
                 modifier = Modifier.onGloballyPositioned { previewBottomPx = it.boundsInWindow().bottom },
             )
             Spacer(Modifier.height(12.dp))
-            DiscordNoticeCard("VOID RPC is being tested independently. Never enter your Discord token or password into a third-party music app.")
+            DiscordNoticeCard("No Discord token or password is required. Unsupported animated artwork uses a public still image or the VOID logo.")
             CustomizeSection(
                 settings = settings,
                 edit = viewModel::edit,

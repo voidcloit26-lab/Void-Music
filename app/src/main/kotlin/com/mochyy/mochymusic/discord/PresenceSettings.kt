@@ -5,6 +5,7 @@ package com.mochyy.mochymusic.discord
 import androidx.annotation.DrawableRes
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.DiscordActivityNameKey
 import com.mochyy.mochymusic.constants.DiscordActivityTypeKey
@@ -103,11 +104,14 @@ data class PresenceSettings(
     // the canvas and apple music animated cover gif: frames per second and pixels, one of CanvasFpsSteps and CanvasSizeSteps
     val canvasFps: Int = DefaultCanvasFps,
     val canvasSize: Int = DefaultCanvasSize,
+    val sharePublicArtwork: Boolean = false,
 ) {
     val spin: SpinStyle get() = SpinStyle(spinSeconds, spinFps)
 
     fun writeTo(prefs: MutablePreferences) {
-        prefs[EnableDiscordRPCKey] = enabled
+        prefs[EnableDiscordRPCKey] = false // never re-enable the retired token gateway
+        prefs[NativeEnabledKey] = enabled
+        prefs[NativeArtworkKey] = sharePublicArtwork
         prefs[DiscordActivityTypeKey] = kind.prefValue
         prefs[DiscordRefreshSecondsKey] = refreshSeconds
         prefs[DiscordActivityNameKey] = name
@@ -154,10 +158,13 @@ data class PresenceSettings(
 
         val FixedCommunityButton = PresenceButton("Join MARS Community", PresenceButtonTarget.MOCHY)
 
+        private val NativeEnabledKey = booleanPreferencesKey("void_native_rpc_enabled_v1")
+        private val NativeArtworkKey = booleanPreferencesKey("void_native_rpc_public_artwork_v1")
         private val Defaults = PresenceSettings()
 
         fun from(prefs: Preferences) = PresenceSettings(
-            enabled = prefs[EnableDiscordRPCKey] ?: Defaults.enabled,
+            enabled = prefs[NativeEnabledKey] ?: Defaults.enabled,
+            sharePublicArtwork = prefs[NativeArtworkKey] ?: false,
             kind = PresenceKind.entries.find { it.prefValue == prefs[DiscordActivityTypeKey] } ?: Defaults.kind,
             refreshSeconds = (prefs[DiscordRefreshSecondsKey] ?: Defaults.refreshSeconds)
                 .coerceIn(MinRefreshSeconds, MaxRefreshSeconds),

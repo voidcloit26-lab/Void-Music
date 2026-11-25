@@ -6,6 +6,10 @@ on:
     paths:
       - '.github/workflows/void-music-fast-test.yml'
       - 'app/src/main/kotlin/com/mochyy/mochymusic/guardian/**'
+      - 'app/src/main/kotlin/com/mochyy/mochymusic/discord/**'
+      - 'app/src/main/kotlin/com/mochyy/mochymusic/ui/screens/settings/integrations/discord/**'
+      - 'app/src/main/cpp/void_music_rpc.cpp'
+      - 'app/build.gradle.kts'
   workflow_dispatch:
 
 permissions:
