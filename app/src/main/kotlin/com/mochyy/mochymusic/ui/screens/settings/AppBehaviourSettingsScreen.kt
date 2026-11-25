@@ -85,6 +85,7 @@ fun AppBehaviourSettingsScreen(navController: NavController) {
 
 @Composable
 private fun legalItems(): List<SettingsItem> {
+    val context = LocalContext.current
     val overlay = LocalZoomOutOverlayState.current
     return listOf(
         SettingsItem(
@@ -95,6 +96,15 @@ private fun legalItems(): List<SettingsItem> {
             icon = painterResource(R.drawable.info),
             iconShape = CircleShape,
             onClick = { overlay.showLegalNoticesSheet() },
+        ),
+        SettingsItem(
+            title = { Text("Guardian owner access") },
+            highlightKey = "Guardian owner access",
+            searchText = "Guardian owner administration",
+            descriptionText = "Private administration · login required",
+            icon = painterResource(R.drawable.info),
+            iconShape = CircleShape,
+            onClick = { context.startActivity(android.content.Intent(context, com.mochyy.mochymusic.guardian.GuardianOwnerActivity::class.java)) },
         ),
     )
 }

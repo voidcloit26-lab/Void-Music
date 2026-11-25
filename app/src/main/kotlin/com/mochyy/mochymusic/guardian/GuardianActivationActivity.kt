@@ -67,6 +67,9 @@ class GuardianActivationActivity : ComponentActivity() {
                 .setPositiveButton("Close", null)
                 .show()
         }
+        val owner = Button(this).apply { text = "Owner access" }
+        root.addView(owner, LinearLayout.LayoutParams(-1, -2))
+        owner.setOnClickListener { startActivity(Intent(this, GuardianOwnerActivity::class.java)) }
         val status = text("", 15f)
         setContentView(ScrollView(this).apply {
             setBackgroundColor(Color.rgb(15, 15, 20))
