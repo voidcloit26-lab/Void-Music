@@ -29,6 +29,8 @@ jobs:
           java-version: '21'
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
       - name: Prepare verified Android toolchain and private SDK
         env:
