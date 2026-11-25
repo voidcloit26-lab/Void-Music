@@ -435,6 +435,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         guardianBlocked = com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this)
         if (guardianBlocked) return
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.mochyy.mochymusic.guardian.GuardianGate.watch(this@MainActivity) {
+                    com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this@MainActivity)
+                }
+            }
+        }
         // a tv that opens the phone app from an old shortcut gets the big-screen one instead
         if (savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && isTelevision()) {
             startActivity(Intent(this, com.mochyy.mochymusic.ui.tv.TvActivity::class.java))

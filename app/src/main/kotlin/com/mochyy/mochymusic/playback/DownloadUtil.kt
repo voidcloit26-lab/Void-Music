@@ -139,6 +139,7 @@ constructor(
                     .build(),
             ),
         ) { dataSpec ->
+            if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context)) throw java.io.IOException("VOID Guardian activation required")
             val mediaId = dataSpec.key ?: error("No media id")
 
             // an imported file has no online copy: looking it up by name downloaded some other recording under its id
@@ -325,8 +326,10 @@ constructor(
         // start included, would undo downloads paused for any other reason.
         scope.launch {
             var wasOffline = false
-            context.dataStore.data
-                .map { it[OfflineModeKey] ?: false }
+            combine(
+                context.dataStore.data.map { it[OfflineModeKey] ?: false }.distinctUntilChanged(),
+                com.mochyy.mochymusic.guardian.GuardianGate.changes,
+            ) { offline, _ -> offline || !com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context) }
                 .distinctUntilChanged()
                 .collect { offline ->
                     kotlinx.coroutines.withContext(Dispatchers.Main) {

@@ -1231,6 +1231,14 @@ class MusicService :
 
         // Discord needs the artist's picture (from the library) and the codec (from the decoder),
         // which both turn up a moment after the song starts
+        scope.launch {
+            com.mochyy.mochymusic.guardian.GuardianGate.watch(this@MusicService) {
+                player.pause()
+                player.stop()
+                discordPresence.update(null)
+                stopSelf()
+            }
+        }
         currentSong.collect(scope) { publishPresence() }
         streamFacts.map { facts -> player.currentMediaItem?.mediaId?.let { facts[it] } }
             .distinctUntilChanged()

@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.mochyy.mochymusic.db.MusicDatabase
 import com.mochyy.mochymusic.link.LinkPlayer
 import com.mochyy.mochymusic.link.tv.TvControl
@@ -42,6 +43,7 @@ import com.mochyy.mochymusic.ui.theme.MochyTheme
 import com.mochyy.mochymusic.utils.SyncUtils
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 // the big-screen app: launched from the tv's home screen, everything inside it is laid out for a remote
@@ -79,6 +81,13 @@ class TvActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         guardianBlocked = com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this)
         if (guardianBlocked) return
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.mochyy.mochymusic.guardian.GuardianGate.watch(this@TvActivity) {
+                    com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this@TvActivity)
+                }
+            }
+        }
         // the phone's launch intro never plays here; work that waits for it (the youtube token) starts now
         LaunchGate.skip()
         WindowCompat.setDecorFitsSystemWindows(window, false)

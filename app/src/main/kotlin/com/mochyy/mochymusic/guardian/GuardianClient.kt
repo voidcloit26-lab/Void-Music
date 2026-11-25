@@ -51,11 +51,15 @@ internal class GuardianClient(
             if (action == "redeem") body.put("code", code)
             val result = post("/v1/$action", body)
             when {
-                result.status == 200 -> if (DeviceEntitlement.save(app, result.body, serverPublicKey))
-                    Outcome.Active else Outcome.InvalidReceipt
+                result.status == 200 -> if (DeviceEntitlement.save(app, result.body, serverPublicKey)) {
+                    // Also handles recovery of an already redeemed invitation.
+                    GuardianGate.changed()
+                    Outcome.Active
+                } else Outcome.InvalidReceipt
                 result.status == 403 && action == "status" &&
                     JSONObject(result.body).optString("error") == "access_inactive" -> {
                     DeviceEntitlement.clear(app)
+                    GuardianGate.changed()
                     Outcome.Revoked
                 }
                 result.status == 403 -> Outcome.Denied

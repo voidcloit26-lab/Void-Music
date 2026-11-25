@@ -97,6 +97,7 @@ constructor(
         session: MediaSession,
         controller: MediaSession.ControllerInfo,
     ): MediaSession.ConnectionResult {
+        if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context)) return MediaSession.ConnectionResult.reject()
         val connectionResult = super.onConnect(session, controller)
         if (controller.packageName == OriginCard.Package) {
             originCardConnections += controller
