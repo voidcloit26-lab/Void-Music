@@ -1,0 +1,43 @@
+name: VOID RPC source test
+on:
+  push:
+    branches: [test]
+    paths:
+      - 'void-rpc-probe/**'
+      - 'guardian/**'
+      - '.github/workflows/void-rpc-probe-test.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate isolated probe source (not an Android build)
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, xml.etree.ElementTree as ET
+          root = Path('void-rpc-probe')
+          tracked = subprocess.check_output(['git', 'ls-files', 'void-rpc-probe'], text=True).splitlines()
+          assert not any(Path(f).suffix.lower() in {'.aar', '.so', '.h', '.jks', '.keystore'} for f in tracked)
+          java = (root / 'app/src/main/java/online/voidbot/rpcprobe/ProbeActivity.java').read_text()
+          cpp = (root / 'app/src/main/cpp/probe.cpp').read_text()
+          manifest = ET.parse(root / 'app/src/main/AndroidManifest.xml').getroot()
+          ns = '{http://schemas.android.com/apk/res/android}'
+          tools = '{http://schemas.android.com/tools}'
+          assert manifest.find('application').attrib[ns+'allowBackup'] == 'false'
+          assert any(p.attrib.get(ns+'name') == 'android.permission.RECORD_AUDIO' and p.attrib.get(tools+'node') == 'remove' for p in manifest.findall('uses-permission'))
+          methods = re.findall(r'private native \w+ (\w+)\(\);', java)
+          assert len(methods) == 4 and all('Java_online_voidbot_rpcprobe_ProbeActivity_'+m in cpp for m in methods)
+          assert '1553388915300245594ULL' in cpp
+          assert 'void_music' in cpp and 'https://discord.gg/marscm' in cpp
+          assert 'ClearRichPresence' in cpp
+          print('Source checks passed. No SDK, native compilation, APK or device test performed.')
+          PY
+      - name: Guardian core regression tests
+        run: python -m unittest discover -s guardian -v

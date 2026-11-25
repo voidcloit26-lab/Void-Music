@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(void_rpc_probe LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(discord_partner_sdk REQUIRED CONFIG)
+add_library(void_rpc_probe SHARED probe.cpp)
+target_link_libraries(void_rpc_probe PRIVATE discord_partner_sdk::discord_partner_sdk)
