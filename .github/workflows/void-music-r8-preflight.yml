@@ -1,0 +1,72 @@
+name: VOID Music R8 release preflight (unsigned)
+on:
+  push:
+    branches: [test]
+    paths: ['.github/workflows/void-music-r8-preflight.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: void-music-r8-preflight
+  cancel-in-progress: false
+jobs:
+  unsigned-release:
+    if: github.ref == 'refs/heads/test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      VOID_GUARDIAN_ENFORCED: 'true'
+      VOID_GUARDIAN_ORIGIN: https://void-guardian-staging.onrender.com
+      VOID_GUARDIAN_PUBLIC_KEY: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBuqQpt9NvZOua1--_997L_zDV1uvgEEhXXBSDc_cp2dCZ90AUycBvuTrIhDsEvue4PvkrQj5dwLFCmPpOkzVew
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/void_brand_audit.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Compile and optimize unsigned SDK-free release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset STORE_PASSWORD KEY_ALIAS KEY_PASSWORD VOID_NATIVE_RPC_AAR VOID_NATIVE_RPC_AUTHORIZED_PRIVATE_TEST
+          test ! -e app/keystore/release.keystore
+          chmod +x gradlew
+          ./gradlew --console=plain --no-configuration-cache :app:assembleUniversalGmsRelease --warning-mode summary
+      - name: Validate R8 and protected release properties without publishing APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re
+          from pathlib import Path
+          candidates=[p for p in Path("app/build/generated").rglob("BuildConfig.java") if "VOID_GUARDIAN_ENFORCED" in p.read_text()]
+          assert len(candidates)==1, candidates
+          cfg=candidates[0].read_text()
+          assert re.search(r"\bVOID_GUARDIAN_ENFORCED\s*=\s*true\s*;",cfg)
+          for field in ("VOID_GUARDIAN_ORIGIN","VOID_GUARDIAN_PUBLIC_KEY"):
+              assert re.search(r"\b"+field+r'\s*=\s*"'+re.escape(os.environ[field])+r'"\s*;',cfg)
+          assert re.search(r"\bVOID_NATIVE_RPC_INCLUDED\s*=\s*false\s*;",cfg)
+          PY
+          mapfile -t apks < <(find app/build/outputs/apk/universalGms/release -maxdepth 1 -name '*.apk' -type f)
+          test "${#apks[@]}" -eq 1
+          apk="${apks[0]}"
+          test -s "$apk"
+          test -s app/build/outputs/mapping/universalGmsRelease/mapping.txt
+          grep -q ' -> ' app/build/outputs/mapping/universalGmsRelease/mapping.txt
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n1)
+          "$(dirname "$signer")/aapt" dump badging "$apk" > release-preflight-badging.txt
+          grep -F "package: name='online.voidbot.music'" release-preflight-badging.txt
+          if grep -q 'application-debuggable' release-preflight-badging.txt; then exit 1; fi
+          if "$signer" verify "$apk" >/dev/null 2>&1; then echo 'Unexpected signature in unsigned preflight'; exit 1; fi
+          printf '%s\n' 'PASS: Guardian enforced, R8 mapping emitted, non-debuggable, unsigned, SDK-free. Not installable; not a production release.' > release-preflight-status.txt
+          git rev-parse HEAD >> release-preflight-status.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: void-music-r8-preflight-report-only
+          path: |
+            release-preflight-status.txt
+            release-preflight-badging.txt
+          retention-days: 3
+          if-no-files-found: error

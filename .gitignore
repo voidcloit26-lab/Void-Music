@@ -95,3 +95,12 @@ app/persistent-debug.keystore
 output-metadata.json
 vcs.xml
 lint/
+
+# Permanent release credentials and private signing material
+/app/keystore/
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
