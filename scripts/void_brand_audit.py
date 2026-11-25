@@ -93,7 +93,12 @@ check_file(src + "core/updater/GithubUpdates.kt", 'const val OwnerDiscordUrl = "
 check_file(src + "ui/screens/settings/devspace/DevProfiles.kt", "OwnerDiscordUrl", "Owner profile contact")
 check_file(src + "ui/screens/update/AboutSheet.kt", "OwnerDiscordUrl", "About contact")
 check_file(src + "modules/GitHubReleases.kt", "Found = Found.Unreachable", "No module release API")
-check_file(src + "discord/DiscordPresence.kt", "PresencePicture.Logo -> emptyList()", "No repository logo requests")
+check_file(src + "discord/NativePresenceMapper.kt", 'private const val Logo = "void_music"', "Registered VOID logo")
+check_file(src + "discord/NativePresenceMapper.kt", "PresencePicture.Logo -> Logo", "Native logo without repository requests")
+mapper = (ROOT / (src + "discord/NativePresenceMapper.kt")).read_text(encoding="utf-8")
+presence = (ROOT / (src + "discord/DiscordPresence.kt")).read_text(encoding="utf-8")
+if "github.com" in mapper or "githubusercontent.com" in mapper or "github.com" in presence or "githubusercontent.com" in presence:
+    errors.append("Unexpected GitHub artwork URL in native presence")
 if (ROOT / ".github/FUNDING.yml").exists():
     errors.append("Upstream funding configuration present")
 

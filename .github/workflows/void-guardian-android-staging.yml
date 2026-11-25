@@ -41,15 +41,24 @@ jobs:
       - name: Verify protected build configuration and APK signature
         run: |
           set -euo pipefail
-          cfg=$(find app/build/generated -name BuildConfig.java | grep -i universalGmsFast | head -n1)
-          test -n "$cfg"
-          grep -Eq 'VOID_GUARDIAN_ENFORCED = true;' "$cfg"
-          grep -F "$VOID_GUARDIAN_PUBLIC_KEY" "$cfg"
-          grep -F "$VOID_GUARDIAN_ORIGIN" "$cfg"
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          candidates = [p for p in Path("app/build/generated").rglob("BuildConfig.java") if "VOID_GUARDIAN_ENFORCED" in p.read_text()]
+          assert len(candidates) == 1, f"Expected one Guardian BuildConfig, found {candidates}"
+          cfg = candidates[0].read_text()
+          assert re.search(r"\bVOID_GUARDIAN_ENFORCED\s*=\s*true\s*;", cfg), "Guardian not enforced"
+          for field in ("VOID_GUARDIAN_ORIGIN", "VOID_GUARDIAN_PUBLIC_KEY"):
+              assert re.search(r"\b" + field + r'\s*=\s*"' + re.escape(os.environ[field]) + r'"\s*;', cfg), f"Incorrect {field}"
+          print("Verified protected BuildConfig:", candidates[0])
+          PY
           apk=$(find app/build/outputs/apk/universalGms/fast -maxdepth 1 -name '*.apk' -print -quit)
           test -s "$apk"
           signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n1)
           "$signer" verify --verbose "$apk"
+          "$(dirname "$signer")/aapt" dump badging "$apk" > guardian-staging-badging.txt
+          grep -F "package: name=\x27online.voidbot.music.fast\x27" guardian-staging-badging.txt
+          if grep -q "application-debuggable" guardian-staging-badging.txt; then exit 1; fi
           sha256sum "$apk" > guardian-staging-apk.sha256
       - uses: actions/upload-artifact@v4
         with:
@@ -57,5 +66,6 @@ jobs:
           path: |
             app/build/outputs/apk/universalGms/fast/*.apk
             guardian-staging-apk.sha256
+            guardian-staging-badging.txt
           retention-days: 3
           if-no-files-found: error
