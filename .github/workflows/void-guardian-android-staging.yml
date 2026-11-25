@@ -57,7 +57,7 @@ jobs:
           signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n1)
           "$signer" verify --verbose "$apk"
           "$(dirname "$signer")/aapt" dump badging "$apk" > guardian-staging-badging.txt
-          grep -F "package: name=\x27online.voidbot.music.fast\x27" guardian-staging-badging.txt
+          grep -F "package: name='online.voidbot.music.fast'" guardian-staging-badging.txt
           if grep -q "application-debuggable" guardian-staging-badging.txt; then exit 1; fi
           sha256sum "$apk" > guardian-staging-apk.sha256
       - uses: actions/upload-artifact@v4
