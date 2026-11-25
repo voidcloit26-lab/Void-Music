@@ -32,6 +32,8 @@ jobs:
         with:
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
       - name: Prepare verified Android toolchain and private SDK
         env:
           SDK_URL: ${{ secrets.VOID_RPC_SDK_URL }}
@@ -83,6 +85,10 @@ jobs:
           if grep -q 'application-debuggable' combined-badging.txt; then exit 1; fi
           "$(dirname "$signer")/aapt" dump permissions "$apk" > combined-permissions.txt
           if grep -q 'FOREGROUND_SERVICE_MICROPHONE' combined-permissions.txt; then exit 1; fi
+          "$(dirname "$signer")/aapt" dump xmltree "$apk" AndroidManifest.xml > combined-manifest.txt
+          if grep -Eq 'com\.discord\.socialsdk\.(ForegroundService|AuthenticationActivity)' combined-manifest.txt; then
+            echo 'Unexpected SDK voice or authentication component'; exit 1
+          fi
           unzip -Z1 "$apk" > combined-files.txt
           grep -Fxq 'lib/arm64-v8a/libvoid_music_rpc.so' combined-files.txt
           grep -Fxq 'lib/arm64-v8a/libdiscord_partner_sdk.so' combined-files.txt
@@ -99,4 +105,4 @@ jobs:
           if-no-files-found: error
       - name: Remove private SDK and build outputs
         if: always()
-        run: rm -rf "$RUNNER_TEMP/void-native-sdk" app/build/outputs/apk
+        run: rm -rf "$RUNNER_TEMP/void-native-sdk" app/build app/.cxx

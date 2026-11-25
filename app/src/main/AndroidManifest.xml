@@ -20,6 +20,8 @@
     <!-- android 17 asks before an app reaches other devices on the wi-fi; without it the tv and phone link can't find or reach anything -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Native listening activity never needs the SDK microphone foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" tools:node="remove" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- lets the player ask a usb dac to run at the song's own rate, or bit-perfect, on android 14+ -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
@@ -1045,6 +1047,10 @@
             android:authorities="${applicationId}.com.dpi.DensityScaler"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Local Rich Presence only: no SDK account-linking or voice foreground service. -->
+        <activity android:name="com.discord.socialsdk.AuthenticationActivity" tools:node="remove" />
+        <service android:name="com.discord.socialsdk.ForegroundService" tools:node="remove" />
 
         <!-- Discord's login page sends the browser back here once the user says yes -->
         <activity
