@@ -1,0 +1,49 @@
+name: VOID Guardian owner live smoke
+on:
+  push:
+    branches: [test]
+    paths: ['.github/workflows/void-guardian-owner-live-smoke.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-smoke:
+    if: github.ref == 'refs/heads/test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check live owner readiness and unauthenticated protections
+        run: |
+          python3 - <<'PY'
+          import urllib.request, urllib.error, urllib.parse
+          base = "https://void-guardian-owner-staging.onrender.com"
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect)
+          def request(path, data=None, headers=None):
+              body = None if data is None else urllib.parse.urlencode(data).encode()
+              req = urllib.request.Request(base + path, data=body, headers=headers or {})
+              try:
+                  response = opener.open(req, timeout=90)
+              except urllib.error.HTTPError as exc:
+                  response = exc
+              with response:
+                  return response.status, response.read(65536), response.headers
+          status, body, _ = request("/healthz")
+          assert status == 200 and body == b"ready", "Owner readiness failed"
+          headers = {"X-Void-Smoke-%02d" % i: "check" for i in range(30)}
+          headers["User-Agent"] = "Mozilla/5.0 (Linux; Android 16) VOID-Music-Staging-Smoke"
+          status, body, response = request("/", headers=headers)
+          assert status == 200 and b"Guardian password" in body and b"Generate unique code" not in body, "Login or header-limit regression"
+          assert response.get("Cache-Control") == "no-store"
+          assert response.get("X-Frame-Options") == "DENY"
+          assert "frame-ancestors 'none'" in response.get("Content-Security-Policy", "")
+          assert not response.get("Set-Cookie"), "Unexpected unauthenticated session"
+          print("PASS: owner readiness, mobile-sized header count, private login and response policies")
+          assert request("/login", {"email":"invalid@example.invalid","password":"not-a-real-password"}, {"Origin":"https://invalid.example"})[0] == 403
+          assert request("/", {"action":"generate","uses":"1","ttl":"3600"}, {"Origin":base})[0] == 401
+          assert request("/logout", {"csrf":"invalid"}, {"Origin":base})[0] == 401
+          assert request("/v1/generate")[0] == 404
+          print("PASS: cross-origin login and unauthorized management blocked; no real credentials or invitations used")
+          PY
