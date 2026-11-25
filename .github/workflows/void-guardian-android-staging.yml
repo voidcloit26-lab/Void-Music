@@ -2,13 +2,16 @@ name: VOID Music protected Android staging build
 on:
   push:
     branches: [test]
-    paths: ['.github/workflows/void-guardian-android-staging.yml']
+    paths:
+      - '.github/workflows/void-guardian-android-staging.yml'
+      - 'app/src/main/**'
+      - 'scripts/void_brand_audit.py'
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: void-guardian-android-staging
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   protected-fast:
     if: github.ref == 'refs/heads/test'
@@ -20,6 +23,8 @@ jobs:
       VOID_GUARDIAN_PUBLIC_KEY: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBuqQpt9NvZOua1--_997L_zDV1uvgEEhXXBSDc_cp2dCZ90AUycBvuTrIhDsEvue4PvkrQj5dwLFCmPpOkzVew
     steps:
       - uses: actions/checkout@v4
+      - name: Check branding and legal navigation
+        run: python3 scripts/void_brand_audit.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
