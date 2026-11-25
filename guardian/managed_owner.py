@@ -189,8 +189,16 @@ def create_app():
     # Separate service, no signing private key needed. Fail closed, never SQLite.
     host = os.environ["VOID_GUARDIAN_OWNER_HOST"]
     email = os.environ["VOID_GUARDIAN_OWNER_EMAIL"].strip().lower()
-    salt = os.environ["VOID_GUARDIAN_OWNER_PASSWORD_SALT"]
-    digest = os.environ["VOID_GUARDIAN_OWNER_PASSWORD_SCRYPT"]
+    # Render's private environment is an optional bootstrap source. Prefer the
+    # offline salted verifier when available. Never accept a Google password.
+    password = os.environ.pop("VOID_GUARDIAN_OWNER_PASSWORD", "")
+    salt = os.environ.get("VOID_GUARDIAN_OWNER_PASSWORD_SALT", "")
+    digest = os.environ.get("VOID_GUARDIAN_OWNER_PASSWORD_SCRYPT", "")
+    if password:
+        if salt or digest or not 16 <= len(password) <= 256:
+            raise ValueError("Invalid owner password configuration")
+        salt = secrets.token_hex(32)
+        digest = password_hash(password, bytes.fromhex(salt)).hex()
     pepper = bytes.fromhex(os.environ["VOID_GUARDIAN_PEPPER"])
     if not settings_valid(host, email, salt, digest) or not 32 <= len(pepper) <= 64:
         raise ValueError("Invalid owner configuration")
