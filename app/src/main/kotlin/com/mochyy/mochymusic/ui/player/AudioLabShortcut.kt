@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -26,14 +27,15 @@ internal fun AudioLabShortcut(onClick: () -> Unit, modifier: Modifier = Modifier
         modifier = modifier
             .size(48.dp)
             .clip(shape)
-            .background(Color.Black.copy(alpha = 0.28f))
-            .border(1.dp, Color.White.copy(alpha = 0.18f), shape)
+            .background(Color.Black.copy(alpha = 0.18f))
+            .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.07f))))
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.36f), Color.White.copy(alpha = 0.12f))), shape)
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painter = painterResource(R.drawable.equalizer),
-            contentDescription = stringResource(R.string.equalizer),
+            contentDescription = "Open Audio Lab",
             tint = Color.White,
             modifier = Modifier.size(22.dp),
         )

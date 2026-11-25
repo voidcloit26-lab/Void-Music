@@ -84,6 +84,7 @@ fun TurntableControls(
     onSongInfoClick: (() -> Unit)? = null,
     /** a tap on the format badge opens the playing stream's info */
     onStreamInfoClick: (() -> Unit)? = null,
+    onAudioLabClick: (() -> Unit)? = null,
 ) {
     val connection = LocalPlayerConnection.current ?: return
     val track by connection.uiState.trackInfo.collectAsState()
@@ -131,6 +132,10 @@ fun TurntableControls(
                 chevron()
                 Spacer(Modifier.width(14.dp))
                 title(Modifier.weight(1f))
+                if (onAudioLabClick != null) {
+                    Spacer(Modifier.width(7.dp))
+                    AudioLabShortcut(onClick = onAudioLabClick)
+                }
             }
             Spacer(Modifier.width(14.dp))
             TurntablePills(likeBurst = likeBurst)
@@ -151,6 +156,10 @@ fun TurntableControls(
                 chevron()
                 Spacer(Modifier.width(14.dp))
                 title(Modifier.weight(1f))
+                if (onAudioLabClick != null) {
+                    Spacer(Modifier.width(7.dp))
+                    AudioLabShortcut(onClick = onAudioLabClick)
+                }
             }
         }
     }

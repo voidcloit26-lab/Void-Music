@@ -218,6 +218,7 @@ private fun ColumnScope.AboutSheetContent(
     popup: PopupSheetState,
     onOpenDevSpace: (Int) -> Unit,
 ) {
+    val context = LocalContext.current
     val installed = shortVersion(BuildConfig.VERSION_NAME)
     val scrollState = rememberScrollState()
     val ringScrollRangePx = with(LocalDensity.current) { 180.dp.toPx() }
@@ -312,6 +313,12 @@ private fun ColumnScope.AboutSheetContent(
             }
 
             Spacer(Modifier.height(18.dp))
+            SectionHeader("Community & contact")
+            Spacer(Modifier.height(8.dp))
+            AboutPillRow(text = "Join MARS Community", onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.DiscordUrl) })
+            Spacer(Modifier.height(8.dp))
+            AboutPillRow(text = "Contact VOID · Owner", onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
+            Spacer(Modifier.height(12.dp))
             AboutPillRow(
                 text = "Legal & Policies",
                 onClick = { popup.showLegalNoticesSheet() },

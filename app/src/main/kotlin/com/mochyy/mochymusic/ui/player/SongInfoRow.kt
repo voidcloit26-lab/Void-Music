@@ -105,6 +105,7 @@ fun SongInfoRow(
     /** Where the side button goes as a page opens (into the page's button column, or behind the chevron). */
     sideLayer: (androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit)? = null,
     onSidePositioned: (androidx.compose.ui.geometry.Rect) -> Unit = {},
+    onAudioLabClick: (() -> Unit)? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val trackInfo by playerConnection.uiState.trackInfo.collectAsState()
@@ -207,7 +208,8 @@ fun SongInfoRow(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (onAudioLabClick != null) AudioLabShortcut(onClick = onAudioLabClick)
             val sidePlaced = (onSidePlaced?.let { Modifier.onGloballyPositioned(it) } ?: Modifier)
                 .onGloballyPositioned { onSidePositioned(it.boundsInRoot()) }
                 .then(sideModifier)

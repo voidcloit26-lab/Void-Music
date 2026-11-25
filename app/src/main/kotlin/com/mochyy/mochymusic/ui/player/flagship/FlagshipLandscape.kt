@@ -264,6 +264,7 @@ internal fun FlagshipLandscape(
     studioPieces: StudioPieces? = null,
     onDoubleTapCover: ((Offset) -> Unit)? = null,
     bottomFlush: Boolean = false,
+    onAudioLabClick: (() -> Unit)? = null,
 ) {
     val connection = LocalPlayerConnection.current ?: return
     val track by connection.uiState.trackInfo.collectAsState()
@@ -646,7 +647,14 @@ internal fun FlagshipLandscape(
                                 .then(if (studioAnchors != null) Modifier.studioAnchor(studioAnchors) { it.songInfo } else Modifier)
                                 .then(Modifier.studioMiddleLayer(studioParts) { it.songInfo }),
                         ) {
-                            SongTitles(title = track.title, artist = track.artist, onClick = onSongInfo)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Box(Modifier.weight(1f)) {
+                                    SongTitles(title = track.title, artist = track.artist, onClick = onSongInfo)
+                                }
+                                if (!onTv && !pageMounted && onAudioLabClick != null) {
+                                    com.mochyy.mochymusic.ui.player.AudioLabShortcut(onClick = onAudioLabClick)
+                                }
+                            }
                         }
                         Spacer(Modifier.height(10.dp))
                         Column(

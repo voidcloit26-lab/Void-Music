@@ -807,7 +807,13 @@ fun ProfileScreen(navController: NavController) {
                                 }
                             },
                         )
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(24.dp))
+                        Text("Community & contact", style = PageTitle.copy(fontSize = 15.sp), modifier = Modifier.padding(start = 2.dp, bottom = 10.dp))
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(PageCard)) {
+                            VoidCommunityRow("Join MARS Community", "discord.gg/marscm", R.drawable.discord) { context.openDevUrl(DiscordUrl) }
+                            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(Color.White.copy(alpha = 0.08f)))
+                            VoidCommunityRow("Contact VOID · Owner", "Discord · 1472442073108971575", R.drawable.person) { context.openDevUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) }
+                        }
                         Spacer(Modifier.height(28.dp))
                         Text(stringResource(R.string.profile_settings_title), style = PageTitle.copy(fontSize = 15.sp), modifier = Modifier.padding(start = 2.dp, bottom = 10.dp))
                         OpenSettingsRow(onClick = { navController.navigate("mochy_settings") })
@@ -1282,5 +1288,23 @@ private fun OpenSettingsRow(onClick: () -> Unit) {
             Icon(painterResource(R.drawable.settings), contentDescription = null, tint = Color(0xFF232323), modifier = Modifier.size(18.dp))
         }
         Text(stringResource(R.string.profile_open_settings), style = PageTitle.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold))
+    }
+}
+
+@Composable
+private fun VoidCommunityRow(title: String, subtitle: String, icon: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(38.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+            Icon(painterResource(icon), null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = PageTitle.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
+            Text(subtitle, fontSize = 11.sp, color = Color.White.copy(alpha = 0.65f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Icon(painterResource(R.drawable.arrow_forward), null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
     }
 }

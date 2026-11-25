@@ -1152,6 +1152,7 @@ private fun PlayerSheet(
                     ambient = if (isFlagship || backgroundStyle == PlayerBackgroundStyle.AMBIENT) ambient else null,
                     pureBlack = pureBlack,
                     editMode = studioEngaged,
+                    onAudioLabClick = if (!onTv && state.isExpanded && !studioEngaged && !showExpandMenu && !showActionMenu) openEqualizer else null,
                     sheetShowing = sheetShowing,
                     interactive = remember(state) { { landscapeOpen && !studio.engaged } },
                     expanded = remember(state) { { state.isExpanded } },
@@ -1509,6 +1510,7 @@ private fun PlayerSheet(
                             onChevronPlaced = { if (!studio.editing) studioAnchors.capture(studioAnchors.chevron, it) },
                             sideModifier = Modifier.studioPiece(studioPieces, com.mochyy.mochymusic.ui.player.studio.StudioPieces.SIDE),
                             chevronModifier = Modifier.studioPiece(studioPieces, com.mochyy.mochymusic.ui.player.studio.StudioPieces.CHEVRON),
+                            onAudioLabClick = if (!onTv && !isTurntable && state.isExpanded && !studioEngaged && !lyricsMounted && !showExpandMenu && !showActionMenu) openEqualizer else null,
                             onSongInfoClick = { if (!studioEngaged) showSongDetails = true },
                             onStreamInfoClick = { if (!studioEngaged) showStreamInfo = true },
                             // the header's title is this one moving, so it hides as that takes over
@@ -1768,6 +1770,7 @@ private fun PlayerSheet(
                     onTitlePositioned = { if (state.isExpanded) songInfoSourceRect = it },
                     onChevronPositioned = { chevronButtonRect = it },
                     likeBurst = likeBurst,
+                    onAudioLabClick = if (!onTv && state.isExpanded && !studioEngaged && !lyricsMounted && !showExpandMenu && !showActionMenu) openEqualizer else null,
                     onSongInfoClick = { if (!studioEngaged) showSongDetails = true },
                     onStreamInfoClick = { if (!studioEngaged) showStreamInfo = true },
                     modifier = Modifier
@@ -1780,17 +1783,6 @@ private fun PlayerSheet(
                             // gone with a page up, so the flagship's controls under them answer
                             letTouchesThroughWhenHidden()
                         },
-                )
-            }
-
-            // A small independent shortcut in the unused portrait header space.
-            // No changes to the existing transport, deck, gestures or DSP.
-            if (!onTv && isFlagship && screenWidth >= 320.dp && state.isExpanded &&
-                !studioEngaged && !lyricsMounted && !showExpandMenu && !showActionMenu) {
-                AudioLabShortcut(
-                    onClick = openEqualizer,
-                    modifier = Modifier.align(Alignment.TopEnd)
-                        .padding(top = statusBarTopInset + 2.dp, end = 12.dp),
                 )
             }
 
