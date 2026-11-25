@@ -1,6 +1,7 @@
 """Separate HTTPS owner application. Never mount this on the activation API."""
 import hashlib
 import hmac
+import json
 import logging
 import os
 import re
@@ -38,6 +39,7 @@ class OwnerApplication:
         self.salt = bytes.fromhex(salt_hex)
         self.clock = clock
         self.sessions = {}
+        self.native_sessions = {}
         self.lock = threading.Lock()
         self.login_lock = threading.Lock()
         self.failures = RequestBudget(limit=5, window=60)
@@ -97,6 +99,96 @@ class OwnerApplication:
         logout = ('<form method="post" action="/logout"><input type="hidden" name="csrf" value="'+csrf+'"><button>Sign out</button></form>').encode()
         return body.replace(b"</main>", logout+b"</main>")
 
+    def native(self, env, start):
+        # JSON-only native interface. Browser cookies and Origin are never accepted
+        # as authority. No CORS headers or browser credential propagation.
+        def reply(status, obj):
+            body = json.dumps(obj, separators=(",", ":")).encode()
+            start(status, [("Content-Type", "application/json"), ("Content-Length", str(len(body))),
+                ("Cache-Control", "no-store"), ("X-Content-Type-Options", "nosniff"),
+                ("Strict-Transport-Security", "max-age=31536000")])
+            return [body]
+        path = env.get("PATH_INFO")
+        if path not in ("/native/v1/login", "/native/v1/list", "/native/v1/generate", "/native/v1/cancel", "/native/v1/revoke", "/native/v1/logout"):
+            return reply("404 Not Found", {"error":"not_found"})
+        if env.get("HTTP_ORIGIN"):
+            return reply("403 Forbidden", {"error":"denied"})
+        if env.get("REQUEST_METHOD") != "POST":
+            return reply("405 Method Not Allowed", {"error":"method"})
+        try:
+            size = int(env.get("CONTENT_LENGTH", "0"))
+            if env.get("CONTENT_TYPE", "").split(";")[0] != "application/json" or not 0 < size <= 4096:
+                raise ValueError
+            raw = env["wsgi.input"].read(size)
+            if len(raw) != size:
+                raise ValueError
+            f = json.loads(raw)
+            if not isinstance(f, dict):
+                raise ValueError
+        except (ValueError, UnicodeError, TypeError):
+            return reply("400 Bad Request", {"error":"invalid_request"})
+        if path == "/native/v1/login":
+            if set(f) != {"email","password"} or not all(isinstance(f[k], str) for k in f) or len(f["email"]) > 128 or len(f["password"]) > 256:
+                return reply("400 Bad Request", {"error":"invalid_request"})
+            if not self.failures.take() or not self.login_lock.acquire(blocking=False):
+                return reply("429 Too Many Requests", {"error":"try_later"})
+            try:
+                digest = password_hash(f["password"], self.salt)
+            finally:
+                self.login_lock.release()
+            if not (hmac.compare_digest(digest,self.digest) and hmac.compare_digest(f["email"].strip().lower().encode(), self.email.encode())):
+                LOG.info("native_owner_login result=denied")
+                return reply("401 Unauthorized", {"error":"invalid_credentials"})
+            token = secrets.token_urlsafe(32)
+            with self.lock:
+                self.sessions.clear()
+                self.native_sessions = {token:self.clock()+SESSION_SECONDS}
+            LOG.info("native_owner_login result=success")
+            return reply("200 OK", {"token":token,"expires_in":SESSION_SECONDS})
+        auth = env.get("HTTP_AUTHORIZATION", "")
+        if not re.fullmatch(r"Bearer [A-Za-z0-9_-]{43}", auth):
+            return reply("401 Unauthorized", {"error":"session_expired"})
+        token = auth[7:]
+        with self.lock:
+            now = self.clock()
+            self.native_sessions = {k:v for k,v in self.native_sessions.items() if v > now}
+            if token not in self.native_sessions:
+                return reply("401 Unauthorized", {"error":"session_expired"})
+            if path == "/native/v1/logout" and not f:
+                self.native_sessions.pop(token, None)
+                return reply("200 OK", {"ok":True})
+        try:
+            if path == "/native/v1/list" and not f:
+                invitations = self.store.list_invitations()
+                devices = self.store.list_activations()
+                return reply("200 OK", {"invitations":invitations[:500],
+                    "devices":[{k:v for k,v in row.items() if k != "device_fingerprint"} for row in devices[:500]],
+                    "truncated":len(invitations)>500 or len(devices)>500})
+            if path == "/native/v1/generate" and set(f) == {"uses","ttl"}:
+                uses, ttl = f["uses"], f["ttl"]
+                if type(uses) is not int or type(ttl) is not int or not 1 <= uses <= 1000 or ttl not in (0,3600,86400,604800):
+                    raise ValueError
+                code = self.store.generate(uses, ttl or None)
+                LOG.info("native_owner_action=generate result=success")
+                return reply("200 OK", {"code":code})
+            if path in ("/native/v1/cancel","/native/v1/revoke") and set(f) == {"id"} and isinstance(f["id"], str):
+                if path.endswith("/cancel"):
+                    if not HEX.fullmatch(f["id"]):
+                        raise ValueError
+                    ok = self.store.cancel_id(f["id"])
+                else:
+                    if not re.fullmatch(r"[1-9][0-9]{15,20}", f["id"]):
+                        raise ValueError
+                    ok = self.store.revoke(f["id"])
+                LOG.info("native_owner_action=%s result=%s", path.rsplit("/",1)[-1], "success" if ok else "not_found")
+                return reply("200 OK", {"ok":ok})
+            return reply("400 Bad Request", {"error":"invalid_request"})
+        except (ValueError, KeyError):
+            return reply("400 Bad Request", {"error":"invalid_request"})
+        except Exception:
+            LOG.warning("native_owner_operation_failed")
+            return reply("503 Service Unavailable", {"error":"unavailable"})
+
     def __call__(self, env, start):
         def reply(status, body=b"", extra=()):
             return self.reply(start, status, body, extra)
@@ -105,6 +197,8 @@ class OwnerApplication:
         path, method = env.get("PATH_INFO"), env.get("REQUEST_METHOD")
         if env.get("QUERY_STRING"):
             return reply("404 Not Found")
+        if path.startswith("/native/"):
+            return self.native(env, start)
         if path == "/healthz" and method == "GET":
             return reply("200 OK", b"ready")
         if path not in ("/", "/login", "/logout"):
@@ -135,6 +229,7 @@ class OwnerApplication:
             new = secrets.token_urlsafe(32)
             with self.lock:
                 self.sessions.clear()
+                self.native_sessions.clear()
                 self.sessions[new] = (secrets.token_urlsafe(32), self.clock()+SESSION_SECONDS)
             LOG.info("owner_login result=success")
             return reply("303 See Other", extra=(("Location","/"),self.cookie(new, SESSION_SECONDS)))
