@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/void-guardian-android-staging.yml'
       - 'app/src/main/**'
+      - 'app/src/test/**'
       - 'scripts/void_brand_audit.py'
       - 'gradle/**'
       - 'app/build.gradle.kts'
@@ -71,6 +72,28 @@ jobs:
           grep -F "package: name='online.voidbot.music.fast'" guardian-staging-badging.txt
           if grep -q "application-debuggable" guardian-staging-badging.txt; then exit 1; fi
           sha256sum "$apk" > guardian-staging-apk.sha256
+      - name: Verify Rich Presence metadata and privacy regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --console=plain --no-configuration-cache :app:tasks --all > "$RUNNER_TEMP/void-gradle-tasks.txt"
+          task="$(awk '$1 ~ /^testUniversalGmsFastUnitTest$/ {print $1; exit}' "$RUNNER_TEMP/void-gradle-tasks.txt")"
+          if [ -z "$task" ]; then
+            task="$(awk '$1 ~ /^testUniversalGmsDebugUnitTest$/ {print $1; exit}' "$RUNNER_TEMP/void-gradle-tasks.txt")"
+          fi
+          test -n "$task" || { echo "No supported unit-test variant; refusing to skip tests"; exit 1; }
+          ./gradlew --console=plain --no-configuration-cache ":app:$task" --tests '*NativePresenceMapperTest'
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = list(Path("app/build/test-results").rglob("TEST-*NativePresenceMapperTest.xml"))
+          assert reports, "Missing Rich Presence test report"
+          for report in reports:
+              root = ET.parse(report).getroot()
+              assert int(root.attrib["tests"]) >= 7, "Missing required tests"
+              assert all(int(root.attrib.get(k, 0)) == 0 for k in ("failures", "errors", "skipped"))
+          print("Rich Presence metadata and privacy unit tests passed; native runtime not tested")
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: void-guardian-protected-staging-apk-not-release
