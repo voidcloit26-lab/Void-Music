@@ -20,3 +20,13 @@ Official docs:
 - https://discord.com/developers/docs/social-sdk/release_notes.html
 - https://docs.discord.com/developers/discord-social-sdk/development-guides/setting-rich-presence
 - https://support-dev.discord.com/hc/en-us/articles/30225844245271-Discord-Social-SDK-Terms
+
+## Reproducible private build
+
+For an authorized Linux developer machine with JDK 17, Gradle 8.11.1 and the SDK packages listed above installed, run from the repository root:
+
+```bash
+bash void-rpc-probe/build-private.sh /absolute/private/discord_partner_sdk.aar /absolute/private/new-rpc-output
+```
+
+The script checks the SDK hash, builds a clean Git snapshot in a temporary folder, verifies the APK signature and native libraries, rejects unexpected microphone/Bluetooth permissions, and writes a private diagnostic ZIP. No SDK is added to Git or uploaded. The output directory must not already exist. Native compile and phone behavior are not proven by this script until it is successfully run. The result is a separate diagnostic, not a distribution-ready combined VOID Music APK.

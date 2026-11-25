@@ -47,6 +47,8 @@ jobs:
           assert any(s.attrib.get(ns+'name') == '.PresenceService' and s.attrib.get(ns+'exported') == 'false' for s in manifest.findall('application/service'))
           print('Source checks passed. No SDK, native compilation, APK or device test performed.')
           PY
+      - name: Validate private build script syntax
+        run: bash -n void-rpc-probe/build-private.sh
       - name: Install Guardian cryptography dependency
         run: python -m pip install 'cryptography>=44,<47'
       - name: Guardian core regression tests
