@@ -56,3 +56,26 @@ class PostgresTests(unittest.TestCase):
     def test_requires_verified_tls_for_real_host(self):
         with self.assertRaises(ValueError):
             self.Store(self.url,b"p"*32)
+
+    def test_restricted_runtime_without_schema_creation(self):
+        from psycopg import connect
+        from psycopg.conninfo import make_conninfo
+        # CI-only database/role, intentionally not privileged. The fixture owns
+        # the tables; the runtime role can perform only the needed DML.
+        with connect(self.url) as conn:
+            conn.execute("""DO $$ BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='guardian_ci_runtime') THEN
+                    CREATE ROLE guardian_ci_runtime LOGIN PASSWORD 'ci-only-runtime';
+                END IF;
+            END $$""")
+            conn.execute("GRANT USAGE ON SCHEMA void_guardian TO guardian_ci_runtime")
+            conn.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA void_guardian TO guardian_ci_runtime")
+        url = make_conninfo(self.url, user="guardian_ci_runtime", password="ci-only-runtime")
+        runtime = self.Store(url, b"p"*32, allow_local_test=True, initialize_schema=False)
+        code = runtime.generate()
+        self.assertEqual(runtime.redeem(code, str(10**19+8), "c"*64), "activated")
+        self.assertTrue(runtime.is_active(str(10**19+8), "c"*64))
+        self.assertTrue(runtime.revoke(str(10**19+8)))
+        self.assertFalse(runtime.is_active(str(10**19+8), "c"*64))
+        with self.assertRaises(PermissionError):
+            self.Store(self.url, b"p"*32, allow_local_test=True, initialize_schema=False)

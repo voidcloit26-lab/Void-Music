@@ -23,8 +23,9 @@ CREATE TABLE IF NOT EXISTS void_guardian.activations (
 LOCK_ID = 82941725011038
 
 class _Transaction:
-    def __init__(self, conn):
+    def __init__(self, conn, initialize_schema):
         self.conn = conn
+        self.initialize_schema = initialize_schema
 
     def execute(self, statement, params=()):
         # All statements are fixed internal SQL from AccessStore; only bound
@@ -32,12 +33,33 @@ class _Transaction:
         return self.conn.execute(statement.replace("?", "%s"), params)
 
     def executescript(self, _sqlite_schema):
-        for statement in SCHEMA.split(";"):
-            if statement.strip():
-                self.conn.execute(statement)
+        if self.initialize_schema:
+            for statement in SCHEMA.split(";"):
+                if statement.strip():
+                    self.conn.execute(statement)
+            return
+        # Managed runtime has DML-only grants. Never attempt schema creation.
+        for table, columns in (
+            ("invitations", "digest, remaining, expires_at"),
+            ("activations", "account_id, device_fingerprint, activated_at, revoked_at"),
+        ):
+            qualified = "void_guardian." + table
+            self.conn.execute("SELECT " + columns + " FROM " + qualified + " LIMIT 0")
+            privileges = self.conn.execute(
+                "SELECT " + ", ".join("has_table_privilege(current_user, %s, %s)" for _ in range(4)),
+                tuple(v for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE") for v in (qualified, privilege)),
+            ).fetchone()
+            if not all(privileges):
+                raise PermissionError("Guardian runtime table grants incomplete")
+        if self.conn.execute(
+            "SELECT has_schema_privilege(current_user, 'void_guardian', 'CREATE'), "
+            "has_database_privilege(current_user, current_database(), 'CREATE')"
+        ).fetchone() != (False, False):
+            raise PermissionError("Guardian runtime role must not create schemas or tables")
 
 class PostgresAccessStore(AccessStore):
-    def __init__(self, database_url, pepper, *, allow_local_test=False):
+    def __init__(self, database_url, pepper, *, allow_local_test=False, initialize_schema=True):
+        self.initialize_schema = initialize_schema
         from psycopg.conninfo import conninfo_to_dict
         settings = conninfo_to_dict(database_url)
         if allow_local_test:
@@ -48,6 +70,8 @@ class PostgresAccessStore(AccessStore):
                 raise ValueError("Guardian PostgreSQL requires sslmode=verify-full")
             if not settings.get("host") or not settings.get("dbname") or not settings.get("user"):
                 raise ValueError("Dedicated database connection required")
+            if not initialize_schema and (settings['dbname'] != 'void_guardian' or settings['user'] != 'guardian_runtime'):
+                raise ValueError("Managed Guardian requires its dedicated runtime role and database")
         super().__init__(database_url, pepper)
 
     @contextmanager
@@ -62,4 +86,4 @@ class PostgresAccessStore(AccessStore):
                 conn.execute("SET LOCAL statement_timeout = '10s'")
                 conn.execute("SELECT pg_advisory_xact_lock(%s)", (LOCK_ID,))
                 conn.execute("SET LOCAL search_path TO void_guardian, pg_catalog")
-                yield _Transaction(conn)
+                yield _Transaction(conn, self.initialize_schema)

@@ -58,7 +58,7 @@ def create_app():
     # The PostgreSQL adapter requires verified TLS and initializes the dedicated schema.
     # No application instance is returned when initialization fails.
     try:
-        store = PostgresAccessStore(url, pepper)
+        store = PostgresAccessStore(url, pepper, initialize_schema=False)
     except Exception:
         raise RuntimeError("Guardian database initialization failed; check dedicated database configuration") from None
     return ManagedApplication(ActivationAPI(DeviceProtocol(store, key)))

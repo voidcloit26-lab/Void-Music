@@ -15,9 +15,11 @@ Render environment variables, entered directly in the service settings:
 
 Do not use a random generated signing key per startup. Back up the key and pepper
 securely. Only its DER public key in unpadded URL-safe base64 goes in the Android
-build. Do not send secret values via chat or commit them. A dedicated Neon role
-must be able to create the void_guardian schema initially; the adapter uses
-only that schema and a transaction advisory lock.
+build. Do not send secret values via chat or commit them. Provision the schema as the dedicated database owner before deployment. The managed
+service must use the separate guardian_runtime role (DML only) in the void_guardian
+database. Grant schema USAGE and SELECT, INSERT, UPDATE, DELETE on both tables.
+Startup verifies the required grants and rejects database or schema CREATE privileges.
+Never place the database owner credentials in Render.
 
 Build command: pip install -r guardian/requirements-server.txt
 Start command: gunicorn --config guardian/deploy/gunicorn.conf.py 'guardian.managed_app:create_app()'
