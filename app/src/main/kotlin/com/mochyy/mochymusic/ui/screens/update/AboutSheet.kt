@@ -54,25 +54,16 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.mochyy.mochymusic.BuildConfig
 import com.mochyy.mochymusic.R
-import com.mochyy.mochymusic.core.updater.GithubOwner
-import com.mochyy.mochymusic.core.updater.GithubRepo
-import com.mochyy.mochymusic.core.updater.GithubRepoUrl
 import com.mochyy.mochymusic.ui.component.PopupSheetState
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 import com.mochyy.mochymusic.ui.component.pressBounce
 import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
 import com.mochyy.mochymusic.ui.screens.donate.showSupportSheet
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import java.net.HttpURLConnection
-import java.net.URL
 import com.mochyy.mochymusic.ui.component.sheetHandleRoom
 
 @Immutable
 private data class LeadDevEntry(
     val name: String,
-    val githubUser: String,
     val devSpaceIndex: Int,
     @DrawableRes val fallbackAvatar: Int,
 )
@@ -81,8 +72,6 @@ private data class LeadDevEntry(
 private data class CreditEntry(
     val name: String,
     val subtitle: String,
-    val githubUser: String,
-    val url: String,
 )
 
 @Immutable
@@ -93,18 +82,10 @@ private data class LicenseEntry(
     val url: String,
 )
 
-@Immutable
-private data class ContributorEntry(
-    val login: String,
-    val avatarUrl: String,
-    val profileUrl: String,
-)
-
 private val LeadDevs =
     listOf(
         LeadDevEntry(
             name = "VOID",
-            githubUser = "voidcloit26-lab",
             devSpaceIndex = 0,
             fallbackAvatar = R.drawable.ic_mochy_mark,
         ),
@@ -115,26 +96,18 @@ private val BaseCredits =
         CreditEntry(
             name = "realidkroo",
             subtitle = "Original Mochy Music creator and upstream developer",
-            githubUser = "realidkroo",
-            url = "https://github.com/realidkroo/Mochy-Music",
         ),
         CreditEntry(
             name = "realkeichi",
             subtitle = "Original Mochy Music contributor",
-            githubUser = "realkeichi",
-            url = "https://github.com/realidkroo/Mochy-Music",
         ),
         CreditEntry(
             name = "vivizzz007",
             subtitle = "Vivimusic dev, The base of this app",
-            githubUser = "vivizzz007",
-            url = "https://github.com/vivizzz007/vivi-music",
         ),
         CreditEntry(
             name = "Mostafa Alagamy",
             subtitle = "Metrolist dev, The base of vivmusic too",
-            githubUser = "mostafaalagamy",
-            url = "https://github.com/mostafaalagamy/Metrolist",
         ),
     )
 
@@ -143,50 +116,34 @@ private val MoreCredits =
         CreditEntry(
             name = "maxrave-dev",
             subtitle = "SimpMusic · lyrics API provider",
-            githubUser = "maxrave-dev",
-            url = "https://github.com/maxrave-dev/SimpMusic",
         ),
         CreditEntry(
             name = "Rukamori",
             subtitle = "ArchiveTune · design & architecture inspiration",
-            githubUser = "rukamori",
-            url = "https://github.com/rukamori/ArchiveTune",
         ),
         CreditEntry(
             name = "fast4x",
             subtitle = "RiMusic · YouTube Music InnerTube service wrapper",
-            githubUser = "fast4x",
-            url = "https://github.com/fast4x/RiMusic",
         ),
         CreditEntry(
             name = "tranxuanthang",
             subtitle = "LRCLIB · synchronized LRC lyrics provider",
-            githubUser = "tranxuanthang",
-            url = "https://github.com/tranxuanthang/lrclib",
         ),
         CreditEntry(
             name = "monochrome-music",
             subtitle = "Monochrome Music · lossless FLAC streams",
-            githubUser = "monochrome-music",
-            url = "https://github.com/monochrome-music/monochrome",
         ),
         CreditEntry(
             name = "Jaakko Pasanen",
             subtitle = "AutoEq · headphone equalizer database",
-            githubUser = "jaakkopasanen",
-            url = "https://github.com/jaakkopasanen/AutoEq",
         ),
         CreditEntry(
             name = "Ibra Al Tabian",
             subtitle = "LyricsPlus · open source lyrics server",
-            githubUser = "ibratabian17",
-            url = "https://github.com/ibratabian17/LyricsPlus",
         ),
         CreditEntry(
             name = "Boidushya",
             subtitle = "Better Lyrics API · synced syllable lyrics",
-            githubUser = "boidushya",
-            url = "https://github.com/better-lyrics/api",
         ),
     )
 
@@ -410,7 +367,7 @@ private fun ColumnScope.LegalNoticesContent() {
     ) {
         Text("Legal & open-source notices", fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
         Text("VOID Music is a modified open-source project. Original copyrights remain with their respective authors.", fontSize = 13.sp)
-        SectionHeader("Attribution")
+        SectionHeader("Copyright & attribution")
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MenuRowSurface).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -424,7 +381,7 @@ private fun ColumnScope.LegalNoticesContent() {
             AboutPillRow(text = entry.tag + " · " + entry.title.substringBefore(" · "), onClick = { context.openUrl(entry.url) })
             Text(entry.subtitle, fontSize = 12.sp)
         }
-        Text("Corresponding source and license information: contact the VOID maintainer.", fontSize = 13.sp)
+        Text("Corresponding GPL source and build instructions are supplied to APK recipients by VOID. Original copyright and license notices remain in the source distribution.", fontSize = 13.sp)
         AboutPillRow(text = "Contact VOID", onClick = { context.openUrl(com.mochyy.mochymusic.core.updater.OwnerDiscordUrl) })
         Spacer(Modifier.height(12.dp))
     }
@@ -549,52 +506,6 @@ private fun PersonRow(
             Spacer(Modifier.width(10.dp))
             ArrowBadge()
         }
-    }
-}
-
-@Composable
-private fun AndMoreRow(
-    avatars: List<String>,
-    onClick: () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val circleSize = 22.dp
-    val step = 13.dp
-    val stackWidth = circleSize + step * (avatars.size - 1).coerceAtLeast(0)
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .pressBounce(interaction, pressedScale = 0.97f)
-                .fillMaxWidth()
-                .height(54.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MenuRowSurface)
-                .clickable(interactionSource = interaction, indication = RemoteFocus, onClick = onClick)
-                .padding(horizontal = 16.dp),
-    ) {
-        Box(
-            contentAlignment = Alignment.CenterStart,
-            modifier = Modifier.width(stackWidth).height(circleSize),
-        ) {
-            avatars.forEachIndexed { index, url ->
-                GithubAvatar(
-                    url = url,
-                    size = circleSize,
-                    modifier =
-                        Modifier
-                            .offset(x = step * index)
-                            .border(1.5.dp, MenuRowSurface, CircleShape),
-                )
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = stringResource(R.string.about_and_more),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = (-0.4).sp,
-        )
     }
 }
 

@@ -113,3 +113,7 @@ for error in errors:
     print("ERROR:", error)
 print(f"Result: {len(errors)} error(s), {len(warnings)} notice(s)")
 sys.exit(1 if errors else 0)
+
+# Legal notices remain; contributor repository/profile URLs must not be bundled in About.
+if "https://github.com/" in about or "githubUser:" in about:
+    raise SystemExit("Unexpected GitHub profile/repository metadata in About")
