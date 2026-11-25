@@ -17,7 +17,10 @@ sha="$(git -C "$root" rev-parse HEAD)"
 android="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 [[ -d "$android" ]] || { echo "Set Android SDK path." >&2; exit 2; }
 export ANDROID_HOME="$android" ANDROID_SDK_ROOT="$android"
-for file in platforms/android-37/android.jar ndk/27.0.12077973/source.properties cmake/3.22.1/bin/cmake; do
+if [[ ! -f "$android/platforms/android-37.0/android.jar" && ! -f "$android/platforms/android-37/android.jar" ]]; then
+  echo "Missing Android SDK platform 37.0." >&2; exit 2
+fi
+for file in ndk/27.0.12077973/source.properties cmake/3.22.1/bin/cmake; do
   [[ -e "$android/$file" ]] || { echo "Missing SDK component: $file" >&2; exit 2; }
 done
 java -version 2>&1 | grep -Eq 'version "21([."]|$)' || { echo "JDK 21 required." >&2; exit 2; }
