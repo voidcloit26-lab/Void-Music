@@ -1,0 +1,66 @@
+name: VOID Guardian staging live smoke
+on:
+  push:
+    branches: [test]
+    paths: ['.github/workflows/void-guardian-live-smoke.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    if: github.ref == 'refs/heads/test'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r guardian/requirements.txt
+      - name: Verify staging only (no owner credentials or real invitation)
+        run: |
+          python - <<'PY'
+          import hashlib, json, secrets, urllib.request, urllib.error
+          from cryptography.hazmat.primitives import hashes, serialization
+          from cryptography.hazmat.primitives.asymmetric import ec
+          from guardian.device_protocol import b64, proof_message
+          base = 'https://void-guardian-staging.onrender.com'
+          def call(path, data=None):
+              request = urllib.request.Request(base+path, data=None if data is None else json.dumps(data).encode(), headers={'Content-Type':'application/json'})
+              try:
+                  response = urllib.request.urlopen(request, timeout=60)
+              except urllib.error.HTTPError as exc:
+                  response = exc
+              with response:
+                  assert response.url == base+path, 'Unexpected redirect'
+                  return response.status, json.load(response), response.headers
+          status, body, headers = call('/healthz')
+          assert status == 200 and body == {'status':'ready'}
+          assert headers.get('Cache-Control') == 'no-store'
+          assert call('/owner')[:2] == (404, {'error':'not_found'})
+          assert call('/v1/status')[0] == 405
+          print('PASS: HTTPS readiness, owner isolation and method restrictions')
+          key = ec.generate_private_key(ec.SECP256R1())
+          der = key.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+          public = b64(der)
+          fp = hashlib.sha256(der).hexdigest()
+          def proof(action, code=''):
+              status, challenge, _ = call('/v1/challenge', {'public_key':public,'action':action})
+              assert status == 200 and challenge['expires_in'] == 120
+              nonce = challenge['nonce']
+              signature = b64(key.sign(proof_message(nonce, fp, action, code), ec.ECDSA(hashes.SHA256())))
+              return {'public_key':public,'nonce':nonce,'signature':signature}
+          data = proof('status')
+          assert call('/v1/status', data)[:2] == (403, {'error':'access_inactive'})
+          assert call('/v1/status', data)[:2] == (403, {'error':'access_denied'})
+          print('PASS: valid device proof reaches live database; nonce replay rejected')
+          data = proof('status')
+          data['signature'] = b64(ec.generate_private_key(ec.SECP256R1()).sign(b'wrong', ec.ECDSA(hashes.SHA256())))
+          assert call('/v1/status', data)[:2] == (403, {'error':'access_denied'})
+          raw = secrets.token_hex(16).upper()
+          code = 'VOID-' + '-'.join(raw[i:i+8] for i in range(0,32,8))
+          data = proof('redeem', code)
+          data['code'] = code
+          assert call('/v1/redeem', data)[:2] == (403, {'error':'access_denied'})
+          print('PASS: wrong device signature and random invalid invitation rejected')
+          PY
