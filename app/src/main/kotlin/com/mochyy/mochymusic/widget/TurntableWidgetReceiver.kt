@@ -30,6 +30,7 @@ class TurntableWidgetReceiver : AppWidgetProvider() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context)) return
         super.onReceive(context, intent)
 
         when (intent.action) {

@@ -49,6 +49,8 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --console=plain --no-configuration-cache :app:assembleUniversalGmsFast --warning-mode summary
+      - name: Native activity mapping regression tests
+        run: ./gradlew --console=plain --no-configuration-cache :app:testUniversalGmsFastUnitTest --tests '*NativePresenceMapperTest'
       - name: Verify APK exists
         run: test -n "$(find app/build/outputs/apk/universalGms/fast -maxdepth 1 -name '*.apk' -print -quit)"
       - name: Upload test APK ZIP

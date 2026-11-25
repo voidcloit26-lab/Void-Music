@@ -52,7 +52,10 @@ class LocalArtworkProvider : ContentProvider() {
 
     override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?): Int = 0
 
-    private fun cover(uri: Uri) =
-        LocalArtwork.fileFor(context ?: throw FileNotFoundException(uri.toString()), uri.lastPathSegment)
-            ?: throw FileNotFoundException(uri.toString())
+    private fun cover(uri: Uri): java.io.File {
+        val app = context ?: throw FileNotFoundException("Artwork unavailable")
+        if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(app)) throw FileNotFoundException("Artwork unavailable")
+        return LocalArtwork.fileFor(app, uri.lastPathSegment)
+            ?: throw FileNotFoundException("Artwork unavailable")
+    }
 }

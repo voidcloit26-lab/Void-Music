@@ -135,7 +135,7 @@ class PhoneLinkHost @Inject constructor(
     // keeps the server, its advert and the library watch up while any device is paired, quiet otherwise
     @Synchronized
     fun refresh() {
-        if (_devices.value.isEmpty()) {
+        if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context) || _devices.value.isEmpty()) {
             stop()
             return
         }
@@ -341,6 +341,7 @@ class PhoneLinkHost @Inject constructor(
     }
 
     private fun route(request: LinkRequest): LinkResponse {
+        if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context)) return LinkResponse.status(403, "activation required")
         // a device still on the old protocol sends its key in a header; told to update rather than turned away as unpaired, which made it forget this phone
         if (request.header(LinkWire.OldKeyHeader) != null) return LinkResponse.status(426, "update VOID Music on that device")
         // the call must be signed by a paired device's key; the key itself is never in the call

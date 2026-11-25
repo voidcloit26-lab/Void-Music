@@ -22,6 +22,7 @@ class CloudLoginActivity : Activity() {
     }
 
     private fun handle(intent: Intent?) {
+        if (com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this)) return
         intent?.data?.let { redirect ->
             EntryPointAccessors.fromApplication(applicationContext, CloudBackupEntryPoint::class.java)
                 .cloudSignIn()

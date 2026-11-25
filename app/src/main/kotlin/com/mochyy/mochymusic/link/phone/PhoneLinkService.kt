@@ -41,7 +41,7 @@ class PhoneLinkService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ActionStop || host.devices.value.isEmpty()) {
+        if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(this) || intent?.action == ActionStop || host.devices.value.isEmpty()) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -66,6 +66,12 @@ class PhoneLinkService : Service() {
     private fun watchState() {
         if (watching) return
         watching = true
+        scope.launch {
+            com.mochyy.mochymusic.guardian.GuardianGate.watch(this@PhoneLinkService) {
+                host.stop()
+                stopSelf()
+            }
+        }
         scope.launch {
             // posted again only when its words change, so one swiped away on android 14+ stays away instead of coming back every 30 seconds
             kotlinx.coroutines.flow.combine(host.devices, host.live, host.lastStream, ticks()) { _, _, _, _ -> status() }
@@ -134,7 +140,7 @@ class PhoneLinkService : Service() {
 
         // android 12+ refuses this from the background, the link then only runs while mochy itself is up
         fun start(context: Context) {
-            if (context.isTelevision()) return
+            if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context) || context.isTelevision()) return
             if (!PhoneLinkHost.hasPairedDevices(context) || !PhoneLinkHost.staysReachable(context)) return
             runCatching { ContextCompat.startForegroundService(context, Intent(context, PhoneLinkService::class.java)) }
                 .onFailure { Timber.tag("Link").i("background link not started: ${it.message}") }

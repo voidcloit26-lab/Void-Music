@@ -139,6 +139,7 @@ class App : Application(), SingletonImageLoader.Factory {
 
         applicationScope.launch(Dispatchers.IO) {
             // a paired device can reach this phone again as soon as mochy is up, after the intro has had the main thread
+            if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(this@App)) return@launch
             if (isTelevision() || !com.mochyy.mochymusic.link.phone.PhoneLinkHost.hasPairedDevices(this@App)) return@launch
             com.mochyy.mochymusic.ui.launch.LaunchGate.awaitIntro()
             phoneLink.get().refresh()
