@@ -171,3 +171,7 @@
 -keepclasseswithmembers class com.music.shazamkit.models.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# Native RPC JNI and SDK initialization; no SDK is linked by default.
+-keep class com.mochyy.mochymusic.discord.NativePresenceBridge { *; }
+-keep class com.discord.socialsdk.** { *; }

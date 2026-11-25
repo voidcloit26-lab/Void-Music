@@ -10,6 +10,30 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
+val nativeRpcApproved = System.getenv("VOID_NATIVE_RPC_AUTHORIZED_PRIVATE_TEST") == "true"
+val nativeRpcAarPath = System.getenv("VOID_NATIVE_RPC_AAR")
+val nativeRpcAar = nativeRpcAarPath?.let { file(it) }
+require(!nativeRpcApproved || (nativeRpcAar != null && nativeRpcAar.isFile)) {
+    "Authorized private native RPC test requires a local SDK AAR"
+}
+require(nativeRpcApproved || nativeRpcAarPath == null) {
+    "SDK file must not be supplied without explicit private-test authorization"
+}
+if (nativeRpcApproved) {
+    val digest = MessageDigest.getInstance("SHA-256")
+    requireNotNull(nativeRpcAar).inputStream().use { input ->
+        val buffer = ByteArray(65536)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    val hash = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+    require(hash == "ea4c080cc7c5ddeccab58f3bdf5682a3e18a7a84a815bb0f33609bfcafba3f99") {
+        "Unexpected Discord SDK; use verified private test release"
+    }
+}
 plugins {
     id("com.android.application")
     alias(libs.plugins.hilt)
@@ -130,6 +154,8 @@ extensions.configure<ApplicationExtension> {
         // Public identifier for the supported native Rich Presence integration.
         // Keep the legacy gateway configuration separate until its replacement is verified.
         buildConfigField("String", "VOID_DISCORD_APPLICATION_ID", "\"1553388915300245594\"")
+        buildConfigField("Boolean", "VOID_NATIVE_RPC_INCLUDED", nativeRpcApproved.toString())
+        externalNativeBuild { cmake { arguments += "-DVOID_NATIVE_RPC=${if (nativeRpcApproved) "ON" else "OFF"}" } }
 
         // Development opt-in: never point an enforced build at an arbitrary runtime origin.
         val guardianEnforced = (localProperties.getProperty("VOID_GUARDIAN_ENFORCED")
@@ -339,6 +365,7 @@ extensions.configure<ApplicationExtension> {
     buildFeatures {
         compose = true
         buildConfig = true
+        prefab = nativeRpcApproved
     }
 
     dependenciesInfo {
@@ -459,6 +486,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
+    if (nativeRpcApproved) implementation(files(requireNotNull(nativeRpcAar)))
     implementation(libs.guava)
     implementation(libs.coroutines.guava)
     implementation(libs.concurrent.futures)

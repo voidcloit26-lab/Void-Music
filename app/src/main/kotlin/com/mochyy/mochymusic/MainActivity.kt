@@ -435,6 +435,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         guardianBlocked = com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this)
         if (guardianBlocked) return
+        com.mochyy.mochymusic.discord.NativePresenceBridge.attach(this)
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
                 com.mochyy.mochymusic.guardian.GuardianGate.watch(this@MainActivity) {

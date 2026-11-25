@@ -20,3 +20,13 @@ add_library(mochystage SHARED stage/splitter.cpp stage/hrtf.cpp stage/tail.cpp s
 # o3 lets the compiler vectorise the ear filters, the biggest cost of the room
 target_compile_options(mochystage PRIVATE -O3 -ffp-contract=fast -Wall -fvisibility=hidden)
 target_link_options(mochystage PRIVATE "-Wl,-z,max-page-size=16384")
+
+# Only the explicit local private build links the separately supplied SDK.
+option(VOID_NATIVE_RPC "Authorized private RPC test" OFF)
+if(VOID_NATIVE_RPC)
+    find_package(discord_partner_sdk REQUIRED CONFIG)
+    add_library(void_music_rpc SHARED void_music_rpc.cpp)
+    set_property(TARGET void_music_rpc PROPERTY CXX_STANDARD 20)
+    target_link_libraries(void_music_rpc PRIVATE discord_partner_sdk::discord_partner_sdk)
+    target_link_options(void_music_rpc PRIVATE "-Wl,-z,max-page-size=16384")
+endif()
