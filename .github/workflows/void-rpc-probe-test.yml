@@ -48,7 +48,9 @@ jobs:
           print('Source checks passed. No SDK, native compilation, APK or device test performed.')
           PY
       - name: Validate private build script syntax
-        run: bash -n void-rpc-probe/build-private.sh
+        run: |
+          bash -n void-rpc-probe/build-private.sh
+          bash -n scripts/build-void-native-private.sh
       - name: Install Guardian cryptography dependency
         run: python -m pip install 'cryptography>=44,<47'
       - name: Guardian core regression tests
