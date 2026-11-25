@@ -26,21 +26,25 @@ jobs:
           tracked = subprocess.check_output(['git', 'ls-files', 'void-rpc-probe'], text=True).splitlines()
           assert not any(Path(f).suffix.lower() in {'.aar', '.so', '.h', '.jks', '.keystore'} for f in tracked)
           java = (root / 'app/src/main/java/online/voidbot/rpcprobe/ProbeActivity.java').read_text()
+          service = (root / 'app/src/main/java/online/voidbot/rpcprobe/PresenceService.java').read_text()
           cpp = (root / 'app/src/main/cpp/probe.cpp').read_text()
           manifest = ET.parse(root / 'app/src/main/AndroidManifest.xml').getroot()
           ns = '{http://schemas.android.com/apk/res/android}'
           tools = '{http://schemas.android.com/tools}'
           assert manifest.find('application').attrib[ns+'allowBackup'] == 'false'
           assert any(p.attrib.get(ns+'name') == 'android.permission.RECORD_AUDIO' and p.attrib.get(tools+'node') == 'remove' for p in manifest.findall('uses-permission'))
-          methods = re.findall(r'private native \w+ (\w+)\([^;]*\);', java)
-          assert len(methods) == 5 and all('Java_online_voidbot_rpcprobe_ProbeActivity_'+m in cpp for m in methods)
+          methods = re.findall(r'private native \w+ (\w+)\([^;]*\);', service)
+          assert len(methods) == 5 and all('Java_online_voidbot_rpcprobe_PresenceService_'+m in cpp for m in methods)
           assert '1553388915300245594ULL' in cpp
           assert 'void_music' in cpp and 'https://discord.gg/marscm' in cpp
           assert 'ClearRichPresence' in cpp
-          assert 'MediaBrowser' in java and 'STATE_PLAYING' in java
-          assert 'getTransportControls' not in java and 'NotificationListenerService' not in java
+          assert 'MediaBrowser' in service and 'STATE_PLAYING' in service
+          assert 'getTransportControls' not in service and 'NotificationListenerService' not in service
           assert 'SetEnd' in cpp and 'ActivityTypes::Listening' in cpp
-          assert 'shareArtwork.setChecked(false)' in java
+          assert 'artwork.setChecked(false)' in java
+          assert 'startForegroundService' in java and 'START_NOT_STICKY' in service
+          assert 'SetEngineManagedAudioSession(true)' in cpp
+          assert any(s.attrib.get(ns+'name') == '.PresenceService' and s.attrib.get(ns+'exported') == 'false' for s in manifest.findall('application/service'))
           print('Source checks passed. No SDK, native compilation, APK or device test performed.')
           PY
       - name: Install Guardian cryptography dependency

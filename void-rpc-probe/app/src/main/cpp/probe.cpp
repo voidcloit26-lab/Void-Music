@@ -46,8 +46,8 @@ void publish(std::string title, std::string artist, std::string art,
     activity.SetAssets(assets);
     if (start > 0) {
         discordpp::ActivityTimestamps timestamps;
-        timestamps.SetStart(start);
-        if (end > start) timestamps.SetEnd(end);
+        timestamps.SetStart(start * 1000ULL);
+        if (end > start) timestamps.SetEnd(end * 1000ULL);
         activity.SetTimestamps(timestamps);
     }
     std::string query = encode(title + " " + artist);
@@ -65,37 +65,38 @@ void publish(std::string title, std::string artist, std::string art,
     status = "Waiting for Discord response";
     client->UpdateRichPresence(std::move(activity), [request](discordpp::ClientResult result) {
         if (request != generation) return;
-        status = result.Successful() ? "SDK accepted update; verify profile on another account" : "SDK rejected update; clear and retry";
+        status = result.Successful() ? "SDK accepted update; verify profile on another account" : "SDK rejected update (type " + std::to_string(static_cast<int>(result.Type())) + ")";
     });
 }
 }
 extern "C" JNIEXPORT void JNICALL
-Java_online_voidbot_rpcprobe_ProbeActivity_initNative(JNIEnv*, jobject) {
+Java_online_voidbot_rpcprobe_PresenceService_initNative(JNIEnv*, jobject) {
     if (!client) {
         client = std::make_shared<discordpp::Client>();
         client->SetApplicationId(APP_ID);
+        client->SetEngineManagedAudioSession(true);
         status = "Ready for local RPC test";
     }
 }
 extern "C" JNIEXPORT void JNICALL
-Java_online_voidbot_rpcprobe_ProbeActivity_publishNative(JNIEnv*, jobject) {
+Java_online_voidbot_rpcprobe_PresenceService_publishNative(JNIEnv*, jobject) {
     publish("Rich Presence test", "VOID Music - test activity", "", static_cast<uint64_t>(std::time(nullptr)), 0, 0);
 }
 extern "C" JNIEXPORT void JNICALL
-Java_online_voidbot_rpcprobe_ProbeActivity_publishTrackNative(JNIEnv* env, jobject,
+Java_online_voidbot_rpcprobe_PresenceService_publishTrackNative(JNIEnv* env, jobject,
     jbyteArray title, jbyteArray artist, jbyteArray art, jlong start, jlong end, jint provider) {
     publish(bytes(env, title), bytes(env, artist), bytes(env, art),
             start > 0 ? static_cast<uint64_t>(start) : 0,
             end > 0 ? static_cast<uint64_t>(end) : 0, provider);
 }
 extern "C" JNIEXPORT void JNICALL
-Java_online_voidbot_rpcprobe_ProbeActivity_clearNative(JNIEnv*, jobject) {
+Java_online_voidbot_rpcprobe_PresenceService_clearNative(JNIEnv*, jobject) {
     ++generation;
     if (client) client->ClearRichPresence();
     status = "Clear requested";
 }
 extern "C" JNIEXPORT jstring JNICALL
-Java_online_voidbot_rpcprobe_ProbeActivity_tickNative(JNIEnv* env, jobject) {
+Java_online_voidbot_rpcprobe_PresenceService_tickNative(JNIEnv* env, jobject) {
     if (client) discordpp::RunCallbacks();
     return env->NewStringUTF(status.c_str());
 }
