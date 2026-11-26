@@ -64,6 +64,54 @@ class SharedContract:
             self.store.read_library(self.a, 'b'*64)
 
 
+    def test_real_signed_session_and_cross_worker_proof(self):
+        # Synthetic local RSA issuer, not a live Clerk tenant.
+        import time
+        import jwt
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec, rsa
+        from guardian.clerk_session import ClerkSessionVerifier
+        from guardian.account_protocol_v2 import AccountProtocol, message
+        from guardian.device_protocol import b64, read_device_key
+        from guardian.durable_challenges import DurableChallenges
+        from guardian.access_store import AccessDenied
+
+        rsa_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pem = rsa_key.public_key().public_bytes(serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo)
+        verifier = ClerkSessionVerifier(issuer=self.issuer, audience='void-music-api', public_key_pem=pem)
+        now = int(time.time())
+        token = jwt.encode(dict(iss=self.issuer, aud='void-music-api', sub='user_new',
+            sid='sess_new', iat=now, nbf=now, exp=now+60), rsa_key, algorithm='RS256')
+        key = ec.generate_private_key(ec.SECP256R1())
+        pub = b64(key.public_key().public_bytes(serialization.Encoding.DER,
+            serialization.PublicFormat.SubjectPublicKeyInfo))
+        fp = read_device_key(pub)[1]
+        second = self.reopen()
+        a = AccountProtocol(self.store, verifier, challenges=DurableChallenges(self.store))
+        b = AccountProtocol(second, verifier, challenges=DurableChallenges(second))
+        def prepare(action, body):
+            nonce = a.challenge(token,pub,action,body)['nonce']
+            sig = b64(key.sign(message(nonce,fp,'sess_new','user_new',action,body),ec.ECDSA(hashes.SHA256())))
+            return nonce,sig
+        def execute(action, body):
+            nonce,sig = prepare(action,body)
+            result = b.execute(token,pub,nonce,sig,action,body)
+            with self.assertRaises(AccessDenied):
+                a.execute(token,pub,nonce,sig,action,body)
+            return result
+        registered = execute('register',{})
+        account = registered['account']
+        self.assertEqual(execute('status',{})['status'],'unactivated')
+        invitation = self.store.owner_issue_free(self.owner,account,'lifetime')
+        execute('redeem_free',{'code':invitation})
+        self.assertEqual(execute('status',{})['status'],'active')
+        self.assertEqual(execute('cloud_write',{'revision':0,'library':self.data}),{'revision':1})
+        self.assertEqual(execute('cloud_read',{})['library'],self.data)
+        self.store.change_state(self.owner,account,'suspended')
+        self.assertEqual(execute('status',{})['status'],'suspended')
+
+
 class SQLiteUnifiedTests(SharedContract, unittest.TestCase):
     def setUp(self):
         self.now = 1800000000

@@ -9,10 +9,15 @@ from guardian.business_store import BusinessStore, DDL as BUSINESS_DDL
 from guardian.external_identity_store import ExternalIdentityStore, DDL as IDENTITY_DDL
 from guardian.cloud_store import CloudStore, DDL as CLOUD_DDL
 from guardian.postgres_identity_test_store import PostgresIdentityTestStore
+from guardian.durable_challenges import DDL as CHALLENGE_DDL
 
 
 class UnifiedSandboxStore(BusinessStore, ExternalIdentityStore, CloudStore):
     """Cooperative constructors create all tables in one disposable SQLite DB."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        with self.transaction() as db:
+            db.execute(CHALLENGE_DDL)
 
 
 class PostgresUnifiedTestStore(PostgresIdentityTestStore, BusinessStore,
@@ -38,6 +43,6 @@ class PostgresUnifiedTestStore(PostgresIdentityTestStore, BusinessStore,
             'id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,').replace('created_at INTEGER', 'created_at BIGINT')
         cloud = CLOUD_DDL.replace('revision INTEGER', 'revision BIGINT').replace('updated_at INTEGER', 'updated_at BIGINT')
         with self.transaction() as db:
-            for statement in (IDENTITY_DDL.replace(' BLOB', ' BYTEA') + '\n' + cloud + '\n' + business).split(';'):
+            for statement in (IDENTITY_DDL.replace(' BLOB', ' BYTEA') + '\n' + cloud + '\n' + business + '\n' + CHALLENGE_DDL).split(';'):
                 if statement.strip():
                     db.execute(statement)
