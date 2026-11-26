@@ -12,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.clerk.api.Clerk
 import com.clerk.api.network.serialization.ClerkResult
-import com.clerk.api.session.GetTokenOptions
+import com.mochyy.mochymusic.BuildConfig
 import com.clerk.ui.auth.AuthView
 
 /**
@@ -21,7 +21,7 @@ import com.clerk.ui.auth.AuthView
  */
 internal object ClerkQaBridge {
     @Synchronized
-    fun initialize(context: Context, publishableKey: String) {
+    fun initialize(context: Context, publishableKey: String = BuildConfig.VOID_CLERK_QA_PUBLISHABLE_KEY) {
         require(Regex("pk_test_[A-Za-z0-9+/=_-]{8,512}").matches(publishableKey))
         Clerk.initialize(context.applicationContext, publishableKey = publishableKey)
     }
@@ -30,7 +30,7 @@ internal object ClerkQaBridge {
         check(Clerk.isInitialized.value)
         val subject = checkNotNull(Clerk.userFlow.value).id
         val sid = checkNotNull(Clerk.session).id
-        val token = when (val result = Clerk.auth.getToken(GetTokenOptions(template = "void-music-api"))) {
+        val token = when (val result = Clerk.auth.getToken()) {
             is ClerkResult.Success -> result.value
             is ClerkResult.Failure -> error("Session token unavailable")
         }

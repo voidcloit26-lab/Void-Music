@@ -171,6 +171,12 @@ extensions.configure<ApplicationExtension> {
         require(!guardianEnforced || (guardianOrigin.isNotEmpty() && guardianPublicKey.isNotEmpty())) {
             "Guardian enforced builds require an HTTPS origin and pinned public signing key"
         }
+        // Only the explicitly opted-in QA variant can carry the development public key.
+        val clerkQaKey = if (clerkQaEnabled) System.getenv("VOID_CLERK_QA_PUBLISHABLE_KEY") ?: "" else ""
+        require(clerkQaKey.isEmpty() || clerkQaKey == "pk_test_bGl2aW5nLXRhZHBvbGUtNTE4Mi5jbGVyay5hY2NvdW50cy5kZXYk") {
+            "Unexpected Clerk development publishable key"
+        }
+        buildConfigField("String", "VOID_CLERK_QA_PUBLISHABLE_KEY", "\"$clerkQaKey\"")
         buildConfigField("Boolean", "VOID_GUARDIAN_ENFORCED", guardianEnforced.toString())
         buildConfigField("String", "VOID_GUARDIAN_ORIGIN", "\"$guardianOrigin\"")
         buildConfigField("String", "VOID_GUARDIAN_PUBLIC_KEY", "\"$guardianPublicKey\"")
