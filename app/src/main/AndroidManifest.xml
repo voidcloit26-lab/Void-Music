@@ -1035,6 +1035,16 @@
                 android:resource="@xml/provider_paths" />
         </provider>
 
+        <provider
+            android:name=".guardian.GuardianUpdateProvider"
+            android:authorities="${applicationId}.GuardianUpdateProvider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/guardian_update_paths" />
+        </provider>
+
         <!-- local songs' covers for Android Auto, widgets and the lock screen, which can't open files in Mochy's own folder; read only, covers folder only -->
         <provider
             android:name="com.mochyy.mochymusic.importer.LocalArtworkProvider"
