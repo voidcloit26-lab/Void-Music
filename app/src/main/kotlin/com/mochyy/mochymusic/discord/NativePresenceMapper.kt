@@ -22,7 +22,7 @@ internal data class NativePresencePayload(
 )
 
 internal object NativePresenceMapper {
-    private const val Logo = "void_music"
+    internal const val Logo = "https://raw.githubusercontent.com/voidcloit26-lab/Void-Music/2dae2d55e47ec04dab73ceca06e7ae7471106846/assets/discord/void_music.png"
     private const val Community = "https://discord.gg/marscm"
     private val ArtHosts = setOf("i.ytimg.com", "lh3.googleusercontent.com", "lh4.googleusercontent.com",
         "lh5.googleusercontent.com", "lh6.googleusercontent.com", "yt3.ggpht.com",
@@ -31,7 +31,7 @@ internal object NativePresenceMapper {
 
     /**
      * Explicit artwork consent is independent of the presence switch. A missing or
-     * unsupported large image uses the registered logo. Animated/local assets are
+     * unsupported large image uses the fixed public VOID logo. Animated/local assets are
      * never uploaded by this transport; their safe public still is used if available.
      */
     fun map(activity: PresenceActivity, sharePublicArtwork: Boolean): NativePresencePayload {
