@@ -49,6 +49,8 @@ import androidx.navigation.NavController
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.discord.DiscordLogin
+import com.mochyy.mochymusic.discord.NativePresenceMapper
+import com.mochyy.mochymusic.discord.PresenceActivity
 import com.mochyy.mochymusic.discord.NowPlaying
 import com.mochyy.mochymusic.discord.PresenceConnection
 import com.mochyy.mochymusic.discord.PresenceImage
@@ -153,6 +155,21 @@ fun DiscordScreen(
                     checked = settings.sharePublicArtwork,
                     onCheckedChange = { on -> viewModel.edit { copy(sharePublicArtwork = on) } },
                 )
+            }
+            if (nativeIncluded) {
+                val actualTrack = playing
+                val payload = actualTrack?.let {
+                    NativePresenceMapper.map(PresenceActivity.build(it, settings, System.currentTimeMillis()), settings.sharePublicArtwork)
+                }
+                Spacer(Modifier.height(12.dp))
+                DiscordNoticeCard(when {
+                    !settings.enabled -> "Enable activity sharing to publish your listening activity."
+                    !settings.sharePublicArtwork -> "Public artwork is off. Enable Share public artwork to send album covers; otherwise the registered VOID Music logo is requested."
+                    payload == null -> "Play a song to check its artwork."
+                    payload.largeAsset == "void_music" -> "No supported public cover for the selected image. The registered VOID Music logo is requested instead."
+                    else -> "Public cover selected for Discord. Discord controls whether the image appears on profiles."
+                })
+                DiscordNoticeCard("Custom activity buttons may be hidden on your own profile. Ask another Discord user to check your activity.")
             }
             Spacer(Modifier.height(12.dp))
             DiscordProfileCard(
