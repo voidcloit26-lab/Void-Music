@@ -176,14 +176,14 @@ class GuardianOwnerActivity : ComponentActivity() {
                     item {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(onClick = { runAction { refresh() } }, enabled = !busy) { Text("Refresh") }
-                            OutlinedButton(onClick = { runAction { try { request("logout") } finally { clearSession() } } }, enabled = !busy) { Text("Sign out") }
+                            OutlinedButton(onClick = { runAction { if (request("logout") != null) clearSession() } }, enabled = !busy) { Text("Sign out") }
                         }
                     }
                     if (!savedSession && GuardianOwnerSession.supported(activity)) item {
                         OutlinedButton(onClick = { confirmDevice("remember") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                             Text("Remember session on this device")
                         }
-                        Text("Protected by your device screen lock. Server expiry and sign-out still apply.", style = MaterialTheme.typography.bodySmall)
+                        Text("Protected by your device screen lock. Your session expires automatically and can be revoked.", style = MaterialTheme.typography.bodySmall)
                     }
                     item {
                         Card {

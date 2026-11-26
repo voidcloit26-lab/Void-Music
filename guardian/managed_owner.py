@@ -13,6 +13,7 @@ from urllib.parse import parse_qs
 from guardian.activation_api import RequestBudget
 from guardian.owner_web import page
 from guardian.postgres_store import PostgresAccessStore
+from guardian.native_owner_sessions import NativeOwnerSessions, NATIVE_SESSION_SECONDS
 
 LOG = logging.getLogger("guardian.owner.audit")
 HEX = re.compile(r"[0-9a-f]{64}")
@@ -28,7 +29,7 @@ def settings_valid(host, email, salt_hex, digest):
 HOST = re.compile(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?")
 
 class OwnerApplication:
-    def __init__(self, store, host, email, salt_hex, password_digest, clock=time.monotonic):
+    def __init__(self, store, host, email, salt_hex, password_digest, clock=time.monotonic, durable_native=None):
         if not settings_valid(host, email, salt_hex, password_digest):
             raise ValueError("Invalid owner settings")
         self.store = store
@@ -40,6 +41,7 @@ class OwnerApplication:
         self.clock = clock
         self.sessions = {}
         self.native_sessions = {}
+        self.durable_native = durable_native
         self.lock = threading.Lock()
         self.login_lock = threading.Lock()
         self.failures = RequestBudget(limit=5, window=60)
@@ -140,23 +142,42 @@ class OwnerApplication:
                 LOG.info("native_owner_login result=denied")
                 return reply("401 Unauthorized", {"error":"invalid_credentials"})
             token = secrets.token_urlsafe(32)
-            with self.lock:
-                self.sessions.clear()
-                self.native_sessions = {token:self.clock()+SESSION_SECONDS}
+            try:
+                with self.lock:
+                    if self.durable_native is not None:
+                        self.durable_native.replace(token)
+                        self.native_sessions.clear()
+                    else:
+                        self.native_sessions = {token:self.clock()+SESSION_SECONDS}
+                    self.sessions.clear()
+            except Exception:
+                LOG.warning("native_owner_session_store_unavailable")
+                return reply("503 Service Unavailable", {"error":"unavailable"})
             LOG.info("native_owner_login result=success")
-            return reply("200 OK", {"token":token,"expires_in":SESSION_SECONDS})
+            return reply("200 OK", {"token":token,"expires_in":NATIVE_SESSION_SECONDS if self.durable_native is not None else SESSION_SECONDS})
         auth = env.get("HTTP_AUTHORIZATION", "")
         if not re.fullmatch(r"Bearer [A-Za-z0-9_-]{43}", auth):
             return reply("401 Unauthorized", {"error":"session_expired"})
         token = auth[7:]
-        with self.lock:
-            now = self.clock()
-            self.native_sessions = {k:v for k,v in self.native_sessions.items() if v > now}
-            if token not in self.native_sessions:
-                return reply("401 Unauthorized", {"error":"session_expired"})
-            if path == "/native/v1/logout" and not f:
-                self.native_sessions.pop(token, None)
-                return reply("200 OK", {"ok":True})
+        try:
+            with self.lock:
+                if self.durable_native is not None:
+                    if not self.durable_native.valid(token):
+                        return reply("401 Unauthorized", {"error":"session_expired"})
+                    if path == "/native/v1/logout" and not f:
+                        self.durable_native.revoke(token)
+                        return reply("200 OK", {"ok":True})
+                else:
+                    now = self.clock()
+                    self.native_sessions = {k:v for k,v in self.native_sessions.items() if v > now}
+                    if token not in self.native_sessions:
+                        return reply("401 Unauthorized", {"error":"session_expired"})
+                    if path == "/native/v1/logout" and not f:
+                        self.native_sessions.pop(token, None)
+                        return reply("200 OK", {"ok":True})
+        except Exception:
+            LOG.warning("native_owner_session_store_unavailable")
+            return reply("503 Service Unavailable", {"error":"unavailable"})
         try:
             if path == "/native/v1/list" and not f:
                 invitations = self.store.list_invitations()
@@ -227,10 +248,16 @@ class OwnerApplication:
                 LOG.info("owner_login result=denied")
                 return reply("401 Unauthorized", self.login_page())
             new = secrets.token_urlsafe(32)
-            with self.lock:
-                self.sessions.clear()
-                self.native_sessions.clear()
-                self.sessions[new] = (secrets.token_urlsafe(32), self.clock()+SESSION_SECONDS)
+            try:
+                with self.lock:
+                    if self.durable_native is not None:
+                        self.durable_native.clear()
+                    self.sessions.clear()
+                    self.native_sessions.clear()
+                    self.sessions[new] = (secrets.token_urlsafe(32), self.clock()+SESSION_SECONDS)
+            except Exception:
+                LOG.warning("native_owner_session_store_unavailable")
+                return reply("503 Service Unavailable")
             LOG.info("owner_login result=success")
             return reply("303 See Other", extra=(("Location","/"),self.cookie(new, SESSION_SECONDS)))
         if not session:
@@ -298,4 +325,12 @@ def create_app():
     if not settings_valid(host, email, salt, digest) or not 32 <= len(pepper) <= 64:
         raise ValueError("Invalid owner configuration")
     store = PostgresAccessStore(os.environ["VOID_GUARDIAN_DATABASE_URL"], pepper, initialize_schema=False)
-    return OwnerApplication(store, host, email, salt, digest)
+    durable = None
+    if os.environ.get("VOID_GUARDIAN_DURABLE_NATIVE_SESSIONS") == "true":
+        # Bind stored session hashes to the current owner credentials. The
+        # plaintext bootstrap password (if configured) is never stored in DB.
+        # A password or verifier change invalidates existing sessions.
+        credential = ("password:" + password) if password else ("verifier:" + salt + ":" + digest)
+        scope = hmac.digest(pepper, ("VOID-owner-scope-v1:" + email + ":" + credential).encode(), hashlib.sha256)
+        durable = NativeOwnerSessions(store, scope)
+    return OwnerApplication(store, host, email, salt, digest, durable_native=durable)
