@@ -89,3 +89,19 @@ class ProtocolTests(unittest.TestCase):
                 return False
         with ThreadPoolExecutor(max_workers=4) as pool:
             self.assertEqual(sum(pool.map(attempt,range(8))),1)
+
+    def test_signed_lease_requires_active_membership(self):
+        from guardian.offline_lease import verify
+        from guardian.device_protocol import unb64
+        self.api.lease_key=ec.generate_private_key(ec.SECP256R1())
+        with self.assertRaises(MembershipDenied):
+            self.call("lease",{})
+        self.call("redeem_free",{"code":self.store.issue_free(self.account,"lifetime")})
+        response=self.call("lease",{})
+        now=self.store._now()
+        lease=verify(unb64(response["payload"]),unb64(response["signature"]),self.api.lease_key.public_key(),
+                     account=self.account,device=self.fp,now=now,trusted_floor=now)
+        self.assertLessEqual(lease.expires_at-lease.issued_at,86400)
+        self.store.set_state(self.account,"suspended")
+        with self.assertRaises(MembershipDenied):
+            self.call("lease",{})

@@ -86,6 +86,9 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, onSignOut: s
                 }, enabled = !busy && Regex("[A-Za-z0-9_-]{43}").matches(key)) { Text("Redeem test key") }
                 Text("Paid membership is not available in this test build.")
             }
+            if (status != "revoked") OutlinedButton(onClick = {
+                run { newRecovery = client.request("rotate_recovery", emptyMap()).getString("recovery") }
+            }, enabled = !busy && newRecovery == null) { Text("Replace recovery code") }
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else {
             Button(onClick = {

@@ -104,3 +104,22 @@ class ExternalIdentityStore(IdentityStore):
             db.execute("UPDATE accounts_v2 SET device=?, recovery=? WHERE id=?",
                        (device,self._digest("recovery",replacement),account))
         return account,replacement
+
+    def rotate_linked_recovery(self, verified_issuer, verified_subject, verified_device):
+        """Recover from a lost registration/recovery response on the current device."""
+        import secrets
+        identity=self._identity(verified_issuer,verified_subject)
+        device=self._device(verified_device)
+        replacement=secrets.token_urlsafe(32)
+        with self.transaction() as db:
+            row=db.execute("SELECT account FROM external_identity_v2 WHERE identity=?",(identity,)).fetchone()
+            if not row:
+                raise MembershipDenied("unknown identity")
+            account=row[0]
+            self._require_device(db,account,device)
+            member=self._membership(db,account)
+            if member and member.state=="revoked":
+                raise MembershipDenied("owner review required")
+            db.execute("UPDATE accounts_v2 SET recovery=? WHERE id=?",
+                       (self._digest("recovery",replacement),account))
+        return replacement

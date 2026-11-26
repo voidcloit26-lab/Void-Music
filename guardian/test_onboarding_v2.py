@@ -58,3 +58,13 @@ class OnboardingTests(unittest.TestCase):
                 return False
         with ThreadPoolExecutor(max_workers=4) as pool:
             self.assertEqual(sum(pool.map(attempt,range(6))),1)
+
+    def test_lost_response_recovery_rotation(self):
+        account,old=self.register()
+        new=self.s.rotate_linked_recovery(self.issuer,"user_new","a"*64)
+        self.assertNotEqual(old,new)
+        with self.assertRaises(MembershipDenied):
+            self.s.rotate_linked_recovery(self.issuer,"user_new","b"*64)
+        with self.assertRaises(MembershipDenied):
+            self.s.recover_linked(self.issuer,"user_new",old,"c"*64)
+        self.assertEqual(self.s.recover_linked(self.issuer,"user_new",new,"c"*64)[0],account)

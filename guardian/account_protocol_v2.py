@@ -2,7 +2,8 @@
 
 A verified Clerk token alone does not authorize a device. Every operation
 requires a single-use P-256 proof bound to its exact action, body and session.
-Only existing linked accounts are supported here. No owner or payment routes.
+Includes unactivated registration, linked recovery and account operations.
+No owner or payment routes.
 """
 from dataclasses import asdict
 import hashlib
@@ -16,7 +17,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from guardian.access_store import AccessDenied
-from guardian.device_protocol import NONCE_RE, read_device_key, unb64
+from guardian.device_protocol import NONCE_RE, read_device_key, unb64, b64
+from guardian.offline_lease import issue as issue_lease
 from guardian.membership_rules import MembershipDenied
 from guardian.external_identity_store import ExternalIdentityStore
 from guardian.cloud_store import CloudStore
@@ -29,6 +31,8 @@ class LinkedCloudStore(ExternalIdentityStore, CloudStore):
 ACTIONS = {
     "register": set(),
     "recover": {"recovery"},
+    "rotate_recovery": set(),
+    "lease": set(),
     "status": set(),
     "redeem_free": {"code"},
     "cloud_read": set(),
@@ -60,8 +64,9 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None):
         self.store, self.verifier, self.clock = store, verifier, clock
+        self.lease_key = lease_key
         self.max_pending = max_pending
         self.pending = {}
         self.lock = threading.Lock()
@@ -70,7 +75,7 @@ class AccountProtocol:
         session = self.verifier.verify(token)
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
-        # Unlinked or replaced devices cannot allocate challenge slots.
+        # Except for registration and recovery, only the current linked device may allocate challenges.
         if action not in ("register", "recover"):
             self.store.resolve(session.issuer, session.subject, fingerprint)
         nonce = secrets.token_urlsafe(32)
@@ -112,6 +117,16 @@ class AccountProtocol:
         # Resolve again after proof; store operations recheck registered device
         # in their own transaction, so a concurrent recovery cannot reuse it.
         account = self.store.resolve(session.issuer, session.subject, fingerprint)
+        if action == "rotate_recovery":
+            return {"recovery": self.store.rotate_linked_recovery(session.issuer, session.subject, fingerprint)}
+        if action == "lease":
+            if self.lease_key is None:
+                raise MembershipDenied("lease issuance disabled")
+            member = self.store.membership(account, fingerprint)
+            if member is None:
+                raise MembershipDenied("inactive")
+            payload, signature = issue_lease(member, account, fingerprint, self.store._now(), self.lease_key)
+            return {"payload": b64(payload), "signature": b64(signature)}
         if action == "status":
             member = self.store.membership(account, fingerprint)
             return {"account": account, "membership": asdict(member) if member else None,
