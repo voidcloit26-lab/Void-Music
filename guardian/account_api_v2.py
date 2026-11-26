@@ -53,7 +53,11 @@ class AccountAPI:
             return reply("404 Not Found",{"error":"not_found"})
         if env.get("REQUEST_METHOD")!="POST":
             return reply("405 Method Not Allowed",{"error":"method_not_allowed"})
-        if not self.budget.take():
+        try:
+            allowed = self.budget.take()
+        except Exception:
+            return reply("503 Service Unavailable",{"error":"unavailable"})
+        if not allowed:
             return reply("429 Too Many Requests",{"error":"retry_later"})
         auth=env.get("HTTP_AUTHORIZATION","")
         if not isinstance(auth,str) or not auth.startswith("Bearer ") or len(auth)>8199 or " " in auth[7:] or not auth[7:]:

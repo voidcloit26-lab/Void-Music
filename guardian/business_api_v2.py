@@ -34,15 +34,18 @@ def invalid_constant(_):
 
 
 class BusinessAPI:
-    def __init__(self, store, *, sandbox=False, clock=time.monotonic, limit=120):
+    def __init__(self, store, *, sandbox=False, clock=time.monotonic, limit=120, budget=None):
         if sandbox is not True:
             raise PermissionError('sandbox only')
         if type(limit) is not int or not 1 <= limit <= 120:
             raise ValueError('invalid request limit')
         self.store, self.clock, self.limit = store, clock, limit
         self.times, self.lock = deque(), threading.Lock()
+        self.budget = budget
 
     def _take(self):
+        if self.budget is not None:
+            return self.budget.take()
         with self.lock:
             now = self.clock()
             while self.times and self.times[0] <= now - 60:
@@ -73,7 +76,11 @@ class BusinessAPI:
             return reply('405 Method Not Allowed', {'error': 'method_not_allowed'})
         if env.get('HTTP_ORIGIN') or env.get('HTTP_COOKIE'):
             return reply('403 Forbidden', {'error': 'access_denied'})
-        if not self._take():
+        try:
+            allowed = self._take()
+        except Exception:
+            return reply('503 Service Unavailable', {'error': 'unavailable'})
+        if not allowed:
             return reply('429 Too Many Requests', {'error': 'retry_later'})
         auth = env.get('HTTP_AUTHORIZATION', '')
         if not isinstance(auth, str) or not re.fullmatch(r'Bearer [A-Za-z0-9_-]{43}', auth):
