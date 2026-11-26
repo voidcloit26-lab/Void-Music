@@ -164,9 +164,9 @@ fun DiscordScreen(
                 Spacer(Modifier.height(12.dp))
                 DiscordNoticeCard(when {
                     !settings.enabled -> "Enable activity sharing to publish your listening activity."
-                    !settings.sharePublicArtwork -> "Public artwork is off. Enable Share public artwork to send album covers; otherwise the registered VOID Music logo is requested."
+                    !settings.sharePublicArtwork -> "Public artwork is off. Enable Share public artwork to send album covers; otherwise the VOID Music logo is requested."
                     payload == null -> "Play a song to check its artwork."
-                    payload.largeAsset == "void_music" -> "No supported public cover for the selected image. The registered VOID Music logo is requested instead."
+                    payload.largeAsset == NativePresenceMapper.Logo -> "No supported public cover for the selected image. The VOID Music logo is requested instead."
                     else -> "Public cover selected for Discord. Discord controls whether the image appears on profiles."
                 })
                 DiscordNoticeCard("Custom activity buttons may be hidden on your own profile. Ask another Discord user to check your activity.")
