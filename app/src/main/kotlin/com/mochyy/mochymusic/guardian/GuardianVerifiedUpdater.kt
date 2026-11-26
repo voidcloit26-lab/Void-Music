@@ -36,8 +36,9 @@ internal class GuardianVerifiedUpdater(
         require(app.packageName == "online.voidbot.music")
     }
 
+    @Suppress("DEPRECATION")
     private fun version(info: PackageInfo): Long =
-        if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+        if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
 
     @Suppress("DEPRECATION")
     private fun flags(): Int = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
@@ -75,9 +76,10 @@ internal class GuardianVerifiedUpdater(
             require(token.length in 1..8192 && Regex("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+").matches(token))
             check(dir.isDirectory || dir.mkdirs())
             val output = target(release)
-            val temp = File.createTempFile("void-", ".partial", dir)
             val connection = URL(base.toString().trimEnd('/') + "/v2/releases/${release.sequence}/apk")
                 .openConnection() as HttpsURLConnection
+            val temp = try { File.createTempFile("void-partial-", ".apk", dir) }
+            catch (e: Exception) { connection.disconnect(); throw e }
             try {
                 connection.instanceFollowRedirects = false
                 connection.connectTimeout = 15000
