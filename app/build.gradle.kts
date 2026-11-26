@@ -10,6 +10,8 @@ val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
 }
+// Explicit opt-in for the disconnected Clerk integration candidate.
+val clerkQaEnabled = System.getenv("VOID_CLERK_QA_ENABLED") == "true"
 val nativeRpcApproved = System.getenv("VOID_NATIVE_RPC_AUTHORIZED_PRIVATE_TEST") == "true"
 val nativeRpcAarPath = System.getenv("VOID_NATIVE_RPC_AAR")
 val nativeRpcAar = nativeRpcAarPath?.let { file(it) }
@@ -249,6 +251,7 @@ extensions.configure<ApplicationExtension> {
     }
 
     sourceSets {
+        if (clerkQaEnabled) getByName("main").java.directories.add("src/clerkQa/kotlin")
         getByName("fdroid") {
             java.directories.add("src/foss/kotlin")
             res.directories.add("src/foss/res")
@@ -486,6 +489,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
+    if (clerkQaEnabled) implementation("com.clerk:clerk-android-ui:1.5.0")
     if (nativeRpcApproved) implementation(files(requireNotNull(nativeRpcAar)))
     implementation(libs.guava)
     implementation(libs.coroutines.guava)
