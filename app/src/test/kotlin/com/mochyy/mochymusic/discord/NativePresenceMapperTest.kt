@@ -25,14 +25,14 @@ class NativePresenceMapperTest {
         assertEquals(track.startMs, result.startMs)
         assertEquals(track.endMs, result.endMs)
         assertEquals(cover, result.largeAsset)
-        assertEquals("void_music", result.smallAsset)
+        assertEquals(NativePresenceMapper.Logo, result.smallAsset)
         assertEquals("OPUS", result.smallText)
         assertEquals(listOf(track.buttons.first(), PresenceActivity.Link("Join MARS Community", mars)), result.buttons)
     }
 
     @Test fun artworkRequiresConsent() {
         val result = NativePresenceMapper.map(track, false)
-        assertEquals("void_music", result.largeAsset)
+        assertEquals(NativePresenceMapper.Logo, result.largeAsset)
         assertNull(result.smallAsset)
         assertNull(result.smallText)
     }
@@ -52,7 +52,7 @@ class NativePresenceMapperTest {
             "https://lh4.googleusercontent.com/abc=w512-h512").forEach {
             assertTrue(it, NativePresenceMapper.publicArtwork(it))
             assertEquals(it, NativePresenceMapper.map(track.copy(largeImage = PresencePicture.Web(it)), true).largeAsset)
-            assertEquals("void_music", NativePresenceMapper.map(track.copy(largeImage = PresencePicture.Web(it)), false).largeAsset)
+            assertEquals(NativePresenceMapper.Logo, NativePresenceMapper.map(track.copy(largeImage = PresencePicture.Web(it)), false).largeAsset)
         }
         assertFalse(NativePresenceMapper.publicArtwork("https://yt3.ggpht.com.evil.example/a"))
         assertFalse(NativePresenceMapper.publicArtwork("https://yt3.ggpht.com/a?token=private"))
@@ -61,8 +61,8 @@ class NativePresenceMapperTest {
     @Test fun animatedAssetsUsePublicStillOnly() {
         val spin = PresencePicture.Spinning(cover, SpinStyle(8, 25))
         assertEquals(cover, NativePresenceMapper.map(track.copy(largeImage = spin), true).largeAsset)
-        assertEquals("void_music", NativePresenceMapper.map(track.copy(largeImage = spin), false).largeAsset)
-        assertEquals("void_music", NativePresenceMapper.map(track.copy(largeImage = PresencePicture.Local("content://media/1")), true).largeAsset)
+        assertEquals(NativePresenceMapper.Logo, NativePresenceMapper.map(track.copy(largeImage = spin), false).largeAsset)
+        assertEquals(NativePresenceMapper.Logo, NativePresenceMapper.map(track.copy(largeImage = PresencePicture.Local("content://media/1")), true).largeAsset)
     }
 
     @Test fun pausedAndInvalidTimestampsDoNotRun() {
