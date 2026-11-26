@@ -530,6 +530,17 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                             onClick = { open("modules") }
                         )
 
+                        if (com.mochyy.mochymusic.guardian.GuardianGate.enforced) {
+                            CategoryBubble(
+                                title = "Guardian owner access",
+                                iconRes = R.drawable.security,
+                                onClick = {
+                                    context.startActivity(android.content.Intent(
+                                        context, com.mochyy.mochymusic.guardian.GuardianOwnerActivity::class.java))
+                                }
+                            )
+                        }
+
                         // pages the modules that are on bring to settings, right under modules
                         com.mochyy.mochymusic.ui.screens.settings.modules.ModuleSettingsPages(open = open, selected = selected)
                     }

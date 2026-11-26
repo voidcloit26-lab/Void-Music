@@ -48,6 +48,26 @@ class DeviceProtocolTests(unittest.TestCase):
         another = self.store.generate()
         with self.assertRaises(AccessDenied): self.protocol.redeem(*args, another)
         self.assertEqual(len(self.store.list_invitations()), 2)
+    def test_reissued_nonce_keeps_original_expiry(self):
+        first = self.protocol.challenge(self.public, "redeem")
+        self.now += 20
+        again = self.protocol.challenge(self.public, "redeem")
+        self.assertEqual(first["nonce"], again["nonce"])
+        self.assertEqual(again["expires_in"], 100)
+        with self.assertRaises(AccessDenied):
+            self.protocol.challenge(self.public, "status")
+        self.now += 101
+        self.assertNotEqual(first["nonce"], self.protocol.challenge(self.public, "redeem")["nonce"])
+
+    def test_bad_proof_does_not_consume_challenge(self):
+        code = self.store.generate()
+        args = self.request("redeem", code)
+        with self.assertRaises(AccessDenied):
+            self.protocol.redeem(args[0], args[1], "AAAA", code)
+        self.assertIn("payload", self.protocol.redeem(*args, code))
+        with self.assertRaises(AccessDenied):
+            self.protocol.redeem(*args, code)
+
     def test_wrong_key(self):
         code = self.store.generate()
         public, nonce, _ = self.request("redeem", code)

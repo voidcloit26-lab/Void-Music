@@ -1,6 +1,10 @@
 package com.mochyy.mochymusic.guardian
 
+import android.app.Activity
+import android.app.KeyguardManager
 import android.content.ClipData
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
@@ -51,7 +55,13 @@ class GuardianOwnerActivity : ComponentActivity() {
         var pending by remember { mutableStateOf<Pair<String,String>?>(null) }
         val durations = listOf(3600 to "1 hour", 86400 to "24 hours", 604800 to "7 days", 0 to "No expiry")
 
+        val activity = this@GuardianOwnerActivity
+        var savedSession by remember { mutableStateOf(GuardianOwnerSession.exists(activity)) }
+        var credentialAction by remember { mutableStateOf("") }
+
         fun clearSession() {
+            GuardianOwnerSession.clear(activity)
+            savedSession = false
             token = ""; password = ""; code = ""; invitations = emptyList(); devices = emptyList()
         }
         suspend fun request(action: String, data: JSONObject = JSONObject()): JSONObject? {
@@ -85,6 +95,36 @@ class GuardianOwnerActivity : ComponentActivity() {
                 finally { busy = false }
             }
         }
+        val credentialLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val action = credentialAction
+            credentialAction = ""
+            if (result.resultCode != Activity.RESULT_OK) {
+                message = "Device authentication cancelled."
+            } else if (action == "remember") {
+                savedSession = GuardianOwnerSession.save(activity, token)
+                message = if (savedSession) "Session remembered until server expiry." else "Could not securely remember this session."
+            } else if (action == "restore") {
+                val restored = GuardianOwnerSession.restore(activity)
+                if (restored == null) {
+                    clearSession()
+                    message = "Saved session is unavailable. Sign in again."
+                } else {
+                    token = restored
+                    runAction { refresh() }
+                }
+            }
+        }
+        fun confirmDevice(action: String) {
+            val manager = getSystemService(KeyguardManager::class.java)
+            @Suppress("DEPRECATION")
+            val intent = manager?.createConfirmDeviceCredentialIntent("VOID Guardian", "Confirm your device screen lock")
+            if (intent == null || !GuardianOwnerSession.supported(activity)) {
+                message = "Secure device screen lock is required to remember an owner session."
+                return
+            }
+            credentialAction = action
+            credentialLauncher.launch(intent)
+        }
         Surface(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding(),
@@ -92,13 +132,18 @@ class GuardianOwnerActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item {
-                    TextButton(onClick = { clearSession(); finish() }, enabled = !busy) { Text("Back") }
+                    TextButton(onClick = { finish() }, enabled = !busy) { Text("Back") }
                     Text("VOID Guardian", style = MaterialTheme.typography.headlineMedium)
                     Text(if (token.isEmpty()) "Private owner access" else "Owner management", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (busy) item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) }
                 if (message.isNotEmpty()) item { Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (token.isEmpty()) {
+                    if (savedSession) item {
+                        OutlinedButton(onClick = { confirmDevice("restore") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                            Text("Resume saved owner session")
+                        }
+                    }
                     item {
                         OutlinedTextField(value = email, onValueChange = { email = it.take(128) },
                             label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -119,6 +164,8 @@ class GuardianOwnerActivity : ComponentActivity() {
                                     val result = request("login",data) ?: return@runAction
                                     val next = result.getString("token")
                                     require(Regex("[A-Za-z0-9_-]{43}").matches(next))
+                                    GuardianOwnerSession.clear(activity)
+                                    savedSession = false
                                     token = next
                                     refresh()
                                 }
@@ -131,6 +178,12 @@ class GuardianOwnerActivity : ComponentActivity() {
                             OutlinedButton(onClick = { runAction { refresh() } }, enabled = !busy) { Text("Refresh") }
                             OutlinedButton(onClick = { runAction { try { request("logout") } finally { clearSession() } } }, enabled = !busy) { Text("Sign out") }
                         }
+                    }
+                    if (!savedSession && GuardianOwnerSession.supported(activity)) item {
+                        OutlinedButton(onClick = { confirmDevice("remember") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                            Text("Remember session on this device")
+                        }
+                        Text("Protected by your device screen lock. Server expiry and sign-out still apply.", style = MaterialTheme.typography.bodySmall)
                     }
                     item {
                         Card {

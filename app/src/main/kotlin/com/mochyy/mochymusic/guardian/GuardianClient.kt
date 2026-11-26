@@ -5,6 +5,9 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -28,23 +31,30 @@ internal class GuardianClient(
         require(serverPublicKey.isNotBlank())
     }
 
-    enum class Outcome { Active, Denied, Revoked, Retry, InvalidReceipt }
+    // Shared by activation UI and background entitlement refresh, even across client instances.
+    companion object { private val exchangeLock = Mutex() }
+    enum class Outcome { Active, Denied, Revoked, Retry, InvalidReceipt, ChallengePending, RateLimited, Unavailable, Timeout }
 
     suspend fun redeem(input: String): Outcome = withContext(Dispatchers.IO) {
         val code = input.trim().uppercase(java.util.Locale.ROOT)
         if (!Regex("VOID-(?:[0-9A-F]{8}-){3}[0-9A-F]{8}").matches(code))
             return@withContext Outcome.Denied
-        exchange("redeem", code)
+        exchangeLock.withLock { exchange("redeem", code) }
     }
 
     suspend fun refresh(): Outcome = withContext(Dispatchers.IO) {
-        exchange("status", "")
+        exchangeLock.withLock { exchange("status", "") }
     }
 
     private fun exchange(action: String, code: String): Outcome = try {
         val public = DeviceEntitlement.encodedPublicKey()
         val challenge = post("/v1/challenge", JSONObject().put("public_key", public).put("action", action))
-        if (challenge.status != 200) Outcome.Retry else {
+        if (challenge.status != 200) when (challenge.status) {
+            403, 409 -> Outcome.ChallengePending
+            429 -> Outcome.RateLimited
+            in 500..599 -> Outcome.Unavailable
+            else -> Outcome.Retry
+        } else {
             val nonce = JSONObject(challenge.body).getString("nonce")
             val body = JSONObject().put("public_key", public).put("nonce", nonce)
                 .put("signature", DeviceEntitlement.signChallenge(nonce, action, code))
@@ -62,10 +72,16 @@ internal class GuardianClient(
                     GuardianGate.changed()
                     Outcome.Revoked
                 }
-                result.status == 403 -> Outcome.Denied
+                result.status == 403 && action == "redeem" -> Outcome.Denied
+                result.status == 429 -> Outcome.RateLimited
+                result.status in 500..599 -> Outcome.Unavailable
                 else -> Outcome.Retry
             }
         }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: java.net.SocketTimeoutException) {
+        Outcome.Timeout
     } catch (_: Exception) {
         // A network failure does not destroy a valid lifetime receipt.
         Outcome.Retry
@@ -77,8 +93,9 @@ internal class GuardianClient(
         val conn = URL(origin.trimEnd('/') + path).openConnection() as HttpsURLConnection
         try {
             conn.instanceFollowRedirects = false
-            conn.connectTimeout = 8000
-            conn.readTimeout = 8000
+            conn.connectTimeout = 20_000
+            // The free staging server may be asleep; allow its first request to wake it.
+            conn.readTimeout = if (path == "/v1/challenge") 75_000 else 25_000
             conn.requestMethod = "POST"
             conn.doOutput = true
             conn.useCaches = false

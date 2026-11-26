@@ -74,10 +74,15 @@ class DeviceProtocol:
         with self.lock:
             now = self.clock()
             self.pending = {n: data for n, data in self.pending.items() if data[2] > now}
+            # A response can be lost when a free host wakes. Reissue only the same
+            # action's still-valid nonce, without extending its original expiry.
+            for pending_nonce, data in self.pending.items():
+                if data[0] == fingerprint:
+                    if data[1] != action:
+                        raise AccessDenied("device challenge already pending")
+                    return {"nonce": pending_nonce, "expires_in": max(1, int(data[2] - now))}
             if len(self.pending) >= self.max_challenges:
                 raise AccessDenied("try again later")
-            if any(d[0] == fingerprint for d in self.pending.values()):
-                raise AccessDenied("device challenge already pending")
             nonce = secrets.token_urlsafe(32)
             self.pending[nonce] = (fingerprint, action, now + 120)
         return {"nonce": nonce, "expires_in": 120}
@@ -87,13 +92,19 @@ class DeviceProtocol:
         if not isinstance(nonce, str) or not NONCE_RE.fullmatch(nonce):
             raise AccessDenied("invalid challenge")
         with self.lock:
-            pending = self.pending.pop(nonce, None)
+            pending = self.pending.get(nonce)
         if not pending or pending[:2] != (fingerprint, action) or pending[2] <= self.clock():
             raise AccessDenied("invalid or expired challenge")
         try:
             key.verify(unb64(signature, 256), proof_message(nonce, fingerprint, action, code), ec.ECDSA(hashes.SHA256()))
         except InvalidSignature as exc:
             raise AccessDenied("invalid device proof") from exc
+        # A failed proof must not consume another device's challenge. A valid
+        # proof consumes it exactly once, even with concurrent requests.
+        with self.lock:
+            if self.pending.get(nonce) != pending or pending[2] <= self.clock():
+                raise AccessDenied("invalid or expired challenge")
+            del self.pending[nonce]
         return fingerprint
 
     def redeem(self, public_key, nonce, signature, code):

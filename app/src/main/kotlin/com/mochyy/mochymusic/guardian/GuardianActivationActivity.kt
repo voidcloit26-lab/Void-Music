@@ -103,7 +103,11 @@ class GuardianActivationActivity : ComponentActivity() {
                             GuardianClient.Outcome.Denied -> "This invitation is invalid or no longer available."
                             GuardianClient.Outcome.Revoked -> "This device has no active access. Contact the owner."
                             GuardianClient.Outcome.InvalidReceipt -> "Access could not be verified. Contact the owner."
-                            else -> "Unable to connect to Guardian. Please try again."
+                            GuardianClient.Outcome.ChallengePending -> "A previous verification is still pending. Wait up to two minutes, then retry or restore access. (G403)"
+                            GuardianClient.Outcome.RateLimited -> "Too many requests. Try again in one minute. (G429)"
+                            GuardianClient.Outcome.Unavailable -> "Guardian is temporarily unavailable. Try again shortly. (G503)"
+                            GuardianClient.Outcome.Timeout -> "Guardian is taking longer to respond. Retry, or restore existing access if the invitation was already used. (GTIME)"
+                            else -> "Unable to connect to Guardian. Check your connection and try again. (GNET)"
                         }
                     }
                 } catch (e: CancellationException) {
@@ -193,7 +197,7 @@ class GuardianActivationActivity : ComponentActivity() {
                                 Button(onClick = { submit(true) }, enabled = validCode && !busy && !success && client != null,
                                     shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color(0xFF170D2D))) {
-                                    AnimatedContent(targetState = if (success) "Access verified" else if (busy) "Verifying device…" else "Unlock VOID Music", label = "guardian action") { label ->
+                                    AnimatedContent(targetState = if (success) "Access verified" else if (busy) "Connecting and verifying…" else "Unlock VOID Music", label = "guardian action") { label ->
                                         Text(label)
                                     }
                                 }

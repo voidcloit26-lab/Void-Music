@@ -16,8 +16,8 @@ internal object GuardianOwnerClient {
         val conn = URL("$origin/native/v1/$action").openConnection() as HttpsURLConnection
         try {
             conn.instanceFollowRedirects = false
-            conn.connectTimeout = 20000
-            conn.readTimeout = 20000
+            conn.connectTimeout = 20_000
+            conn.readTimeout = 75_000
             conn.requestMethod = "POST"
             conn.doOutput = true
             conn.useCaches = false
