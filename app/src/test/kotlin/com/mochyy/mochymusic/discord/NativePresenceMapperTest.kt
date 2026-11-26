@@ -47,6 +47,17 @@ class NativePresenceMapperTest {
         assertTrue(NativePresenceMapper.publicArtwork("https://is3-ssl.mzstatic.com/a.jpg"))
     }
 
+    @Test fun publicYouTubeArtistAndAlbumCdnHostsAreSupported() {
+        listOf("https://yt3.ggpht.com/abc=s512", "https://yt3.googleusercontent.com/abc=s512",
+            "https://lh4.googleusercontent.com/abc=w512-h512").forEach {
+            assertTrue(it, NativePresenceMapper.publicArtwork(it))
+            assertEquals(it, NativePresenceMapper.map(track.copy(largeImage = PresencePicture.Web(it)), true).largeAsset)
+            assertEquals("void_music", NativePresenceMapper.map(track.copy(largeImage = PresencePicture.Web(it)), false).largeAsset)
+        }
+        assertFalse(NativePresenceMapper.publicArtwork("https://yt3.ggpht.com.evil.example/a"))
+        assertFalse(NativePresenceMapper.publicArtwork("https://yt3.ggpht.com/a?token=private"))
+    }
+
     @Test fun animatedAssetsUsePublicStillOnly() {
         val spin = PresencePicture.Spinning(cover, SpinStyle(8, 25))
         assertEquals(cover, NativePresenceMapper.map(track.copy(largeImage = spin), true).largeAsset)
