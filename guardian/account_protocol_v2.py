@@ -22,6 +22,7 @@ from guardian.offline_lease import issue as issue_lease
 from guardian.membership_rules import MembershipDenied
 from guardian.external_identity_store import ExternalIdentityStore
 from guardian.cloud_store import CloudStore
+from guardian.durable_challenges import DurableChallenges, ChallengeDenied
 
 
 class LinkedCloudStore(ExternalIdentityStore, CloudStore):
@@ -64,9 +65,10 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
+        self.challenges = challenges
         self.max_pending = max_pending
         self.pending = {}
         self.lock = threading.Lock()
@@ -78,6 +80,14 @@ class AccountProtocol:
         # Except for registration and recovery, only the current linked device may allocate challenges.
         if action not in ("register", "recover"):
             self.store.resolve(session.issuer, session.subject, fingerprint)
+        if self.challenges is not None:
+            scope = DurableChallenges.scope(session.issuer, session.subject)
+            try:
+                nonce = self.challenges.issue(scope, fingerprint, lambda n: message(
+                    n, fingerprint, session.session_id, session.subject, action, body))
+            except ChallengeDenied as exc:
+                raise AccessDenied("challenge unavailable") from exc
+            return {"nonce": nonce, "expires_in": 60}
         nonce = secrets.token_urlsafe(32)
         signed = message(nonce, fingerprint, session.session_id, session.subject, action, body)
         with self.lock:
@@ -96,18 +106,25 @@ class AccountProtocol:
         if not isinstance(nonce, str) or not NONCE_RE.fullmatch(nonce):
             raise AccessDenied("invalid nonce")
         signed = message(nonce, fingerprint, session.session_id, session.subject, action, body)
-        with self.lock:
-            pending = self.pending.get(nonce)
-        if not pending or pending[0] != signed or pending[1] <= self.clock():
-            raise AccessDenied("invalid challenge")
+        if self.challenges is None:
+            with self.lock:
+                pending = self.pending.get(nonce)
+            if not pending or pending[0] != signed or pending[1] <= self.clock():
+                raise AccessDenied("invalid challenge")
         try:
             key.verify(unb64(signature, 256), signed, ec.ECDSA(hashes.SHA256()))
         except InvalidSignature as exc:
             raise AccessDenied("invalid device proof") from exc
-        with self.lock:
-            if self.pending.get(nonce) != pending or pending[1] <= self.clock():
-                raise AccessDenied("invalid challenge")
-            del self.pending[nonce]
+        if self.challenges is not None:
+            try:
+                self.challenges.consume(nonce, DurableChallenges.scope(session.issuer, session.subject), fingerprint, signed)
+            except ChallengeDenied as exc:
+                raise AccessDenied("invalid challenge") from exc
+        else:
+            with self.lock:
+                if self.pending.get(nonce) != pending or pending[1] <= self.clock():
+                    raise AccessDenied("invalid challenge")
+                del self.pending[nonce]
         if action == "register":
             account, recovery = self.store.register(session.issuer, session.subject, fingerprint)
             return {"account": account, "recovery": recovery, "status": "unactivated"}
