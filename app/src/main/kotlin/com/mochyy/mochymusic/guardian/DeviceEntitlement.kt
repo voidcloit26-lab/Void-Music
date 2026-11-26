@@ -64,6 +64,18 @@ object DeviceEntitlement {
         return Base64.encodeToString(signature, B64)
     }
 
+    /** Staged V2 proof: no change to existing V1 activation or playback gates. */
+    internal fun signAccountRequest(nonce: String, sessionId: String, subject: String,
+                                    action: String, body: Map<String, Any?>): String {
+        val bytes = AccountProofV2.message(nonce, fingerprint(), sessionId, subject, action, body)
+        val privateKey = store().getKey(Alias, null) as java.security.PrivateKey
+        val signature = Signature.getInstance("SHA256withECDSA").apply {
+            initSign(privateKey)
+            update(bytes)
+        }.sign()
+        return Base64.encodeToString(signature, B64)
+    }
+
     private fun decode(value: String, max: Int): ByteArray {
         require(value.length in 1..max && value.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '_' || it == '-' })
         val bytes = Base64.decode(value, B64)
