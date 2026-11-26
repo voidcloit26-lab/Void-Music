@@ -3,7 +3,7 @@
 Trusted callers must first authenticate owners and prove device key possession.
 Not an HTTP API or production store. Paid mode is deliberately absent.
 """
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import hashlib
 import hmac
 import re
@@ -36,8 +36,9 @@ class IdentityStore:
         if not isinstance(pepper, bytes) or len(pepper) < 32:
             raise ValueError("server secret required")
         self.path, self.pepper, self.clock = path, pepper, clock
-        with sqlite3.connect(path) as db:
-            db.executescript(SCHEMA)
+        with closing(sqlite3.connect(path)) as db:
+            with db:
+                db.executescript(SCHEMA)
 
     @contextmanager
     def transaction(self):
