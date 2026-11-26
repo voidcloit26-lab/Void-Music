@@ -68,7 +68,7 @@ internal class GuardianAccountClient(
     private suspend fun checkedSession(): Session = session().also {
         check(expectedSubject == null || it.subject == expectedSubject)
         check(expectedSessionId == null || it.sessionId == expectedSessionId)
-        require(it.token.length in 1..8192 && Regex("[A-Za-z0-9_-]+\\\\.[A-Za-z0-9_-]+\\\\.[A-Za-z0-9_-]+").matches(it.token))
+        require(it.token.length in 1..8192 && Regex("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+").matches(it.token))
     }
 
     private fun objectMap(value: JSONObject): Map<String, Any?> =
