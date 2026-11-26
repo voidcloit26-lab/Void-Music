@@ -24,7 +24,9 @@ internal data class NativePresencePayload(
 internal object NativePresenceMapper {
     private const val Logo = "void_music"
     private const val Community = "https://discord.gg/marscm"
-    private val ArtHosts = setOf("i.ytimg.com", "lh3.googleusercontent.com", "i.scdn.co")
+    private val ArtHosts = setOf("i.ytimg.com", "lh3.googleusercontent.com", "lh4.googleusercontent.com",
+        "lh5.googleusercontent.com", "lh6.googleusercontent.com", "yt3.ggpht.com",
+        "yt3.googleusercontent.com", "i.scdn.co")
     private val AppleHost = Regex("is[1-5]-ssl\\.mzstatic\\.com")
 
     /**
