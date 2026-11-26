@@ -63,3 +63,44 @@ class ExternalIdentityStore(IdentityStore):
                 raise MembershipDenied("identity not linked")
             self._require_device(db,row[0],device)
             return row[0]
+
+    def register(self, verified_issuer, verified_subject, verified_device):
+        """Create a new unactivated account atomically after device proof.
+
+        Existing identities and devices must recover/link instead. This never
+        migrates a legacy entitlement or grants membership.
+        """
+        import secrets
+        identity=self._identity(verified_issuer,verified_subject)
+        device=self._device(verified_device)
+        account,recovery=secrets.token_hex(16),secrets.token_urlsafe(32)
+        with self.transaction() as db:
+            if db.execute("SELECT 1 FROM external_identity_v2 WHERE identity=?",(identity,)).fetchone():
+                raise MembershipDenied("existing identity requires recovery")
+            if db.execute("SELECT 1 FROM accounts_v2 WHERE device=?",(device,)).fetchone():
+                raise MembershipDenied("existing device requires linking")
+            db.execute("INSERT INTO accounts_v2 VALUES (?,?,?,?)",
+                       (account,device,self._digest("recovery",recovery),self._now()))
+            db.execute("INSERT INTO external_identity_v2 VALUES (?,?)",(identity,account))
+        return account,recovery
+
+    def recover_linked(self, verified_issuer, verified_subject, recovery, verified_new_device):
+        """Require verified external identity AND single-use recovery secret."""
+        import secrets
+        identity=self._identity(verified_issuer,verified_subject)
+        device=self._device(verified_new_device)
+        digest=self._digest("recovery",recovery)
+        replacement=secrets.token_urlsafe(32)
+        with self.transaction() as db:
+            row=db.execute("SELECT a.id,a.recovery FROM accounts_v2 a JOIN external_identity_v2 e ON e.account=a.id WHERE e.identity=?",(identity,)).fetchone()
+            if not row or not hmac.compare_digest(row[1],digest):
+                raise MembershipDenied("recovery denied")
+            account=row[0]
+            if db.execute("SELECT 1 FROM accounts_v2 WHERE device=? AND id<>?",(device,account)).fetchone():
+                raise MembershipDenied("device already assigned")
+            member=self._membership(db,account)
+            if member and member.state=="revoked":
+                raise MembershipDenied("owner review required")
+            db.execute("UPDATE accounts_v2 SET device=?, recovery=? WHERE id=?",
+                       (device,self._digest("recovery",replacement),account))
+        return account,replacement

@@ -27,6 +27,8 @@ class LinkedCloudStore(ExternalIdentityStore, CloudStore):
 
 
 ACTIONS = {
+    "register": set(),
+    "recover": {"recovery"},
     "status": set(),
     "redeem_free": {"code"},
     "cloud_read": set(),
@@ -41,6 +43,8 @@ def canonical_body(action, body):
         raise ValueError("invalid action body")
     if "revision" in body and (type(body["revision"]) is not int or not 0 <= body["revision"] < 2**63-1):
         raise ValueError("invalid revision")
+    if "recovery" in body and (not isinstance(body["recovery"], str) or len(body["recovery"]) != 43):
+        raise ValueError("invalid recovery credential")
     if "code" in body and (not isinstance(body["code"], str) or len(body["code"]) != 43):
         raise ValueError("invalid key")
     data = json.dumps(body, sort_keys=True, ensure_ascii=True, separators=(",", ":"), allow_nan=False).encode("ascii")
@@ -67,7 +71,8 @@ class AccountProtocol:
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
         # Unlinked or replaced devices cannot allocate challenge slots.
-        self.store.resolve(session.issuer, session.subject, fingerprint)
+        if action not in ("register", "recover"):
+            self.store.resolve(session.issuer, session.subject, fingerprint)
         nonce = secrets.token_urlsafe(32)
         signed = message(nonce, fingerprint, session.session_id, session.subject, action, body)
         with self.lock:
@@ -98,6 +103,12 @@ class AccountProtocol:
             if self.pending.get(nonce) != pending or pending[1] <= self.clock():
                 raise AccessDenied("invalid challenge")
             del self.pending[nonce]
+        if action == "register":
+            account, recovery = self.store.register(session.issuer, session.subject, fingerprint)
+            return {"account": account, "recovery": recovery, "status": "unactivated"}
+        if action == "recover":
+            account, recovery = self.store.recover_linked(session.issuer, session.subject, body["recovery"], fingerprint)
+            return {"account": account, "recovery": recovery}
         # Resolve again after proof; store operations recheck registered device
         # in their own transaction, so a concurrent recovery cannot reuse it.
         account = self.store.resolve(session.issuer, session.subject, fingerprint)

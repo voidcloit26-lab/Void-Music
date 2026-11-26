@@ -5,6 +5,7 @@ import java.security.MessageDigest
 /** Canonical request bytes shared with Guardian's Python V2 protocol. */
 internal object AccountProofV2 {
     private val actions = mapOf(
+        "register" to emptySet(), "recover" to setOf("recovery"),
         "status" to emptySet(), "redeem_free" to setOf("code"),
         "cloud_read" to emptySet(), "cloud_write" to setOf("revision", "library"),
         "cloud_clear" to setOf("revision")
@@ -53,6 +54,7 @@ internal object AccountProofV2 {
             require(revision is Int || revision is Long)
             require((revision as Number).toLong() in 0 until Long.MAX_VALUE)
         }
+        if ("recovery" in body) require((body["recovery"] as? String)?.length == 43)
         if ("code" in body) require((body["code"] as? String)?.length == 43)
         return encode(body).also { require(it.length <= 600 * 1024) }
     }
