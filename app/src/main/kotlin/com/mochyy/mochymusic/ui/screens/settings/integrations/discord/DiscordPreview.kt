@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -125,7 +126,8 @@ internal fun DiscordProfileCard(
             modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(DiscordColors.Profile),
+                .background(Brush.verticalGradient(listOf(Color(0xFF282137), DiscordColors.Profile, Color(0xFF13131B))))
+                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(20.dp)),
     ) {
         Box(
             Modifier
@@ -242,8 +244,9 @@ internal fun DiscordActivityPreview(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
-                .background(DiscordColors.Activity)
+                .clip(RoundedCornerShape(18.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF352B4A), DiscordColors.Activity, Color(0xFF1A1923))))
+                .border(1.dp, Color.White.copy(alpha = 0.13f), RoundedCornerShape(18.dp))
                 .padding(14.dp),
     ) {
         val prefix =
@@ -285,9 +288,10 @@ internal fun DiscordActivityPreview(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(30.dp)
+                                .height(34.dp)
                                 .clip(CircleShape)
-                                .background(DiscordColors.Profile),
+                                .background(Color(0xFF30283E))
+                                .border(1.dp, Color.White.copy(alpha = 0.10f), CircleShape),
                     ) {
                         Text(button.label, color = DiscordColors.Primary, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                     }
