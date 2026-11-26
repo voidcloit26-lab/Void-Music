@@ -11,7 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.clerk.api.Clerk
-import com.clerk.api.network.serialization.onSuccess
+import com.clerk.api.network.serialization.ClerkResult
 import com.clerk.api.session.GetTokenOptions
 import com.clerk.ui.auth.AuthView
 
@@ -30,15 +30,17 @@ internal object ClerkQaBridge {
         check(Clerk.isInitialized.value)
         val subject = checkNotNull(Clerk.userFlow.value).id
         val sid = checkNotNull(Clerk.session).id
-        var token: String? = null
-        Clerk.auth.getToken(GetTokenOptions(template = "void-music-api")).onSuccess { token = it }
+        val token = when (val result = Clerk.auth.getToken(GetTokenOptions(template = "void-music-api"))) {
+            is ClerkResult.Success -> result.value
+            is ClerkResult.Failure -> error("Session token unavailable")
+        }
         // Do not pair a token with an identity that changed mid-request.
         check(Clerk.userFlow.value?.id == subject && Clerk.session?.id == sid)
-        return GuardianAccountClient.Session(checkNotNull(token), subject, sid)
+        return GuardianAccountClient.Session(token, subject, sid)
     }
 
     suspend fun signOut() {
-        Clerk.auth.signOut()
+        check(Clerk.auth.signOut() is ClerkResult.Success) { "Sign out failed" }
     }
 }
 
@@ -47,8 +49,10 @@ internal object ClerkQaBridge {
 internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
     val initialized by Clerk.isInitialized.collectAsState()
     val user by Clerk.userFlow.collectAsState()
+    val initializationError by Clerk.initializationError.collectAsState()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
+            !initialized && initializationError != null -> Text("Authentication unavailable. Reopen the app to retry.")
             !initialized -> CircularProgressIndicator()
             user == null -> AuthView()
             else -> signedIn()
