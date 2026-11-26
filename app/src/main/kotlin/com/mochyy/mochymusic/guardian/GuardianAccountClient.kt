@@ -17,6 +17,8 @@ import javax.net.ssl.HttpsURLConnection
 internal class GuardianAccountClient(
     origin: String,
     private val session: suspend () -> Session,
+    private val expectedSubject: String? = null,
+    private val expectedSessionId: String? = null,
 ) {
     // Never log or persist instances of Session or responses containing recovery codes.
     class Session(val token: String, val subject: String, val sessionId: String)
@@ -36,7 +38,7 @@ internal class GuardianAccountClient(
                 // Snapshot the exact request before the challenge; caller mutations
                 // cannot alter the body after it has been signed.
                 val snapshot = objectMap(JSONObject(AccountProofV2.canonicalBody(action, body)))
-                val auth = session()
+                val auth = checkedSession()
                 require(auth.token.length in 1..8192 && Regex("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+").matches(auth.token))
                 require(Regex("user_[A-Za-z0-9]{1,120}").matches(auth.subject))
                 require(Regex("sess_[A-Za-z0-9]{1,120}").matches(auth.sessionId))
@@ -48,13 +50,26 @@ internal class GuardianAccountClient(
                 val nonce = challenge.getString("nonce")
                 val proof = DeviceEntitlement.signAccountRequest(nonce, auth.sessionId,
                     auth.subject, action, snapshot)
+                // Clerk session tokens can expire between the challenge and execution.
+                // Refresh the token without allowing identity or session changes.
+                val refreshed = checkedSession()
+                check(refreshed.subject == auth.subject && refreshed.sessionId == auth.sessionId)
                 val execution = JSONObject().put("public_key", key).put("action", action)
                     .put("body", JSONObject(canonical)).put("nonce", nonce).put("signature", proof)
                 // No automatic retry of a mutation: a lost response may have
                 // committed the operation. Refresh state before retrying.
-                post("/v2/execute", auth.token, execution)
+                val response = post("/v2/execute", refreshed.token, execution)
+                val after = checkedSession()
+                check(after.subject == auth.subject && after.sessionId == auth.sessionId)
+                response
             }
         }
+
+    private suspend fun checkedSession(): Session = session().also {
+        check(expectedSubject == null || it.subject == expectedSubject)
+        check(expectedSessionId == null || it.sessionId == expectedSessionId)
+        require(it.token.length in 1..8192 && Regex("[A-Za-z0-9_-]+\\\\.[A-Za-z0-9_-]+\\\\.[A-Za-z0-9_-]+").matches(it.token))
+    }
 
     private fun objectMap(value: JSONObject): Map<String, Any?> =
         value.keys().asSequence().associateWith { convert(value.get(it)) }
@@ -87,6 +102,7 @@ internal class GuardianAccountClient(
             conn.outputStream.use { it.write(bytes) }
             val status = conn.responseCode
             if (status != 200) throw RequestFailed(status)
+            require(conn.contentType?.substringBefore(";")?.trim()?.lowercase() == "application/json")
             val output = ByteArrayOutputStream()
             conn.inputStream.use { input ->
                 val buffer = ByteArray(8192)

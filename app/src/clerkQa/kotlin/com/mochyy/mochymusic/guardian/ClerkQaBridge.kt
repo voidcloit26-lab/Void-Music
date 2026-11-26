@@ -8,6 +8,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.clerk.api.Clerk
@@ -49,13 +51,36 @@ internal object ClerkQaBridge {
 internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
     val initialized by Clerk.isInitialized.collectAsState()
     val user by Clerk.userFlow.collectAsState()
+    val activeSession by Clerk.sessionFlow.collectAsState()
     val initializationError by Clerk.initializationError.collectAsState()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
             !initialized && initializationError != null -> Text("Authentication unavailable. Reopen the app to retry.")
             !initialized -> CircularProgressIndicator()
-            user == null -> AuthView()
-            else -> signedIn()
+            user == null || activeSession == null -> AuthView()
+            else -> key(user?.id, activeSession?.id) { signedIn() }
+        }
+    }
+}
+
+
+/** Composes the registered account screen for an explicitly supplied QA origin.
+ * Never invoke from the V1 playback gate; no real service is selected here. */
+@Composable
+internal fun ClerkGuardianQaHost(origin: String) {
+    ClerkQaAuthScreen {
+        val user by Clerk.userFlow.collectAsState()
+        val activeSession by Clerk.sessionFlow.collectAsState()
+        val subject = user?.id
+        val sid = activeSession?.id
+        if (subject != null && sid != null) {
+            key(subject, sid) {
+                val client = remember(origin, subject, sid) {
+                    GuardianAccountClient(origin, session = { ClerkQaBridge.currentSession() },
+                        expectedSubject = subject, expectedSessionId = sid)
+                }
+                GuardianAccountQaScreen(client, onSignOut = { ClerkQaBridge.signOut() })
+            }
         }
     }
 }
