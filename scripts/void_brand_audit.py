@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Audit user-facing VOID Music branding without removing upstream GPL attribution."""
 from pathlib import Path
+import hashlib
 import re
 import sys
 
@@ -93,11 +94,26 @@ check_file(src + "core/updater/GithubUpdates.kt", 'const val OwnerDiscordUrl = "
 check_file(src + "ui/screens/settings/devspace/DevProfiles.kt", "OwnerDiscordUrl", "Owner profile contact")
 check_file(src + "ui/screens/update/AboutSheet.kt", "OwnerDiscordUrl", "About contact")
 check_file(src + "modules/GitHubReleases.kt", "Found = Found.Unreachable", "No module release API")
-check_file(src + "discord/NativePresenceMapper.kt", 'private const val Logo = "void_music"', "Registered VOID logo")
-check_file(src + "discord/NativePresenceMapper.kt", "PresencePicture.Logo -> Logo", "Native logo without repository requests")
+# Permit only the immutable, project-owned logo PNG; no arbitrary GitHub artwork,
+# API requests, repository redirects or user-supplied GitHub URLs.
+logo_url = "https://raw.githubusercontent.com/voidcloit26-lab/Void-Music/2dae2d55e47ec04dab73ceca06e7ae7471106846/assets/discord/void_music.png"
+logo_declaration = f'internal const val Logo = "{logo_url}"'
+check_file(src + "discord/NativePresenceMapper.kt", logo_declaration, "Pinned VOID logo")
+check_file(src + "discord/NativePresenceMapper.kt", "PresencePicture.Logo -> Logo", "Native VOID logo mapping")
+logo_file = ROOT / "assets/discord/void_music.png"
+if not logo_file.is_file():
+    errors.append("Missing VOID logo PNG")
+else:
+    logo_bytes = logo_file.read_bytes()
+    blob_header = f"blob {len(logo_bytes)}".encode("ascii") + bytes([0])
+    if hashlib.sha1(blob_header + logo_bytes).hexdigest() != "48762d4d6427daed84d5c50137521357670d4a9a":
+        errors.append("VOID logo PNG differs from the reviewed pinned asset")
 mapper = (ROOT / (src + "discord/NativePresenceMapper.kt")).read_text(encoding="utf-8")
 presence = (ROOT / (src + "discord/DiscordPresence.kt")).read_text(encoding="utf-8")
-if "github.com" in mapper or "githubusercontent.com" in mapper or "github.com" in presence or "githubusercontent.com" in presence:
+if mapper.count(logo_declaration) != 1:
+    errors.append("Expected exactly one pinned VOID logo declaration")
+remaining_mapper = mapper.replace(logo_declaration, "", 1).lower()
+if any(host in source for source in (remaining_mapper, presence.lower()) for host in ("github.com", "githubusercontent.com")):
     errors.append("Unexpected GitHub artwork URL in native presence")
 if (ROOT / ".github/FUNDING.yml").exists():
     errors.append("Upstream funding configuration present")
