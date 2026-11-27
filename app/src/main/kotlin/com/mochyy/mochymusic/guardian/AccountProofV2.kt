@@ -6,6 +6,7 @@ import java.security.MessageDigest
 internal object AccountProofV2 {
     private val actions = mapOf(
         "register" to emptySet(), "recover" to setOf("recovery"),
+        "register_with_code" to setOf("code"), "redeem_activation" to setOf("code"),
         "rotate_recovery" to emptySet(), "lease" to emptySet(),
         "status" to emptySet(), "redeem_free" to setOf("code"),
         "cloud_read" to emptySet(), "cloud_write" to setOf("revision", "library"),

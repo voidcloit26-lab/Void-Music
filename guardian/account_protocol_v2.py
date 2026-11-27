@@ -31,6 +31,8 @@ class LinkedCloudStore(ExternalIdentityStore, CloudStore):
 
 ACTIONS = {
     "register": set(),
+    "register_with_code": {"code"},
+    "redeem_activation": {"code"},
     "recover": {"recovery"},
     "rotate_recovery": set(),
     "lease": set(),
@@ -65,10 +67,11 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
+        self.activation_codes = activation_codes
         self.max_pending = max_pending
         self.pending = {}
         self.lock = threading.Lock()
@@ -78,7 +81,9 @@ class AccountProtocol:
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
         # Except for registration and recovery, only the current linked device may allocate challenges.
-        if action not in ("register", "recover"):
+        if action in ("register_with_code", "redeem_activation") and self.activation_codes is None:
+            raise MembershipDenied("activation upgrade disabled")
+        if action not in ("register", "recover", "register_with_code"):
             self.store.resolve(session.issuer, session.subject, fingerprint)
         if self.challenges is not None:
             scope = DurableChallenges.scope(session.issuer, session.subject)
@@ -125,6 +130,16 @@ class AccountProtocol:
                 if self.pending.get(nonce) != pending or pending[1] <= self.clock():
                     raise AccessDenied("invalid challenge")
                 del self.pending[nonce]
+        if action == "register_with_code":
+            if self.activation_codes is None:
+                raise MembershipDenied("activation upgrade disabled")
+            account, recovery, member = self.activation_codes.register(session.issuer, session.subject, fingerprint, body["code"])
+            return {"account":account,"recovery":recovery,"membership":asdict(member),"status":member.status(self.store._now())}
+        if action == "redeem_activation":
+            if self.activation_codes is None:
+                raise MembershipDenied("activation upgrade disabled")
+            member = self.activation_codes.redeem(session.issuer,session.subject,fingerprint,body["code"])
+            return {"membership":asdict(member)}
         if action == "register":
             account, recovery = self.store.register(session.issuer, session.subject, fingerprint)
             return {"account": account, "recovery": recovery, "status": "unactivated"}
