@@ -62,6 +62,17 @@ internal class GuardianVerifiedUpdater(
         require(signer(current) == release.signerSha256 && signer(candidate) == release.signerSha256)
     }
 
+    /** Verify a policy even when the installed version is already current.
+     * A transport failure must never manufacture a required-update decision. */
+    suspend fun inspect(payload: ByteArray, signature: ByteArray, trustedNow: Long): String =
+        withContext(Dispatchers.IO) {
+            val candidate = SignedGuardianPolicy.release(payload, signature, releaseKey, trustedNow)
+            val current = installed()
+            require(signer(current) == candidate.signerSha256) { "Unexpected installed signing certificate" }
+            check(releaseState.verifyAndRemember(payload, signature, trustedNow) == candidate)
+            candidate.decision(version(current))
+        }
+
     private fun policy(payload: ByteArray, signature: ByteArray, now: Long, previous: SignedGuardianPolicy.Release?) =
         SignedGuardianPolicy.release(payload, signature, releaseKey, now, previous).also {
             require(it.latest > version(installed()))
