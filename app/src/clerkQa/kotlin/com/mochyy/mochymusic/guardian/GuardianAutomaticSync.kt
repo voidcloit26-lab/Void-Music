@@ -15,9 +15,13 @@ import kotlinx.coroutines.withContext
  * implicit first backup, automatic restore, deletion or retry after a conflict. */
 internal object GuardianAutomaticSync {
     enum class Status { DISABLED, ENABLED, SYNCING, REVIEW_REQUIRED }
+    interface Port {
+        suspend fun prepareAutomatic(account: String): CloudSyncPolicy.Baseline
+        suspend fun automaticPass(account: String, baseline: CloudSyncPolicy.Baseline): CloudSyncPolicy.Baseline
+    }
     private data class Configuration(
         val account: String,
-        val cloud: GuardianQaCloud,
+        val cloud: Port,
         val baseline: CloudSyncPolicy.Baseline,
         val stillCurrent: () -> Boolean
     )
@@ -29,10 +33,10 @@ internal object GuardianAutomaticSync {
     private var configuration: Configuration? = null
     private var job: Job? = null
 
-    suspend fun enable(account: String, cloud: GuardianQaCloud, stillCurrent: () -> Boolean): Boolean =
+    suspend fun enable(account: String, cloud: Port, stillCurrent: () -> Boolean): Boolean =
         withContext(Dispatchers.IO) {
             val started = synchronized(lock) {
-                check(configuration == null && job?.isActive != true)
+                check(configuration == null && job?.isCompleted != false)
                 generation
             }
             check(stillCurrent())
@@ -50,7 +54,8 @@ internal object GuardianAutomaticSync {
             generation++
             configuration = null
             job?.cancel()
-            job = null
+            // A cancelled blocking transport may still be unwinding. Retain its job
+            // until completion so a subsequent session cannot overlap it.
             state.value = Status.DISABLED
         }
     }
@@ -59,7 +64,7 @@ internal object GuardianAutomaticSync {
     fun schedule(account: String) {
         synchronized(lock) {
             val selected = configuration ?: return
-            if (selected.account != account || job?.isActive == true) return
+            if (selected.account != account || job?.isCompleted == false) return
             val next = scope.launch(start = CoroutineStart.LAZY) {
                 try {
                     check(selected.stillCurrent())
