@@ -50,13 +50,11 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
     }
     BackHandler(enabled = codes.isNotEmpty()) { /* Acknowledge the one-time codes first. */ }
     LaunchedEffect(client) { run { summary = client.request("summary") } }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("GUARDIAN BUSINESS", style = MaterialTheme.typography.headlineMedium)
-        Text("Owner access · staging")
+    GuardianAccountLayout {
+        GuardianBrandHeader("Guardian Business", "Owner tools & membership")
         TextButton(onClick = back, enabled = !busy && codes.isEmpty()) { Text("Back") }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (error.isNotEmpty()) Text(error,color=MaterialTheme.colorScheme.error)
+        if (error.isNotEmpty()) GuardianAccountNotice(error)
         OutlinedButton(onClick = { run { summary = client.request("summary") } },enabled=!busy) { Text("Refresh") }
         summary?.let { info ->
             Text("Accounts: ${info.optInt("accounts")}")
