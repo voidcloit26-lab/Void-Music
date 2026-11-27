@@ -35,6 +35,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var approvedBackup by remember(client) { mutableStateOf<GuardianQaCloud.FirstBackup?>(null) }
     var approvedRestore by remember(client) { mutableStateOf<GuardianQaCloud.RestorePreview?>(null) }
     var approvedUpdate by remember(client) { mutableStateOf<GuardianQaCloud.UpdatePreview?>(null) }
+    var approvedPreferences by remember(client) { mutableStateOf<GuardianQaCloud.PreferencePreview?>(null) }
 
     suspend fun refresh() {
         linkRequired = false
@@ -76,6 +77,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     approvedBackup = null
                     approvedRestore = null
                     approvedUpdate = null
+                    approvedPreferences = null
                     if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
                 }
                 error = when (e.status) {
@@ -110,6 +112,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             approvedBackup = null
             approvedRestore = null
             approvedUpdate = null
+                    approvedPreferences = null
         }
     }
 
@@ -262,6 +265,13 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                         "${preview.plan.conflictingPlaylists.size} conflicts. No changes made."
                 }
             }, enabled = !busy && libraryMatches && approvedBackup == null) { Text("Preview restore") }
+            if (status == "active" && libraryMatches) {
+                OutlinedButton(onClick = {
+                    run { approvedPreferences = cloud.previewPreferences(accountId) }
+                }, enabled = !busy && approvedPreferences == null && newRecovery == null &&
+                    approvedBackup == null && approvedUpdate == null && approvedRestore == null) { Text("Review saved playback settings") }
+                Text("Create a library backup first. Settings changes are separate from music metadata.", style = MaterialTheme.typography.bodySmall)
+            }
             if (!libraryMatches) Text("Local backup and restore require a verified library owner.")
             Text("No automatic uploads, audio files or overwrites. Only confirm if all reviewed local metadata belongs to you.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
@@ -328,6 +338,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             text = { Text("Upload additions to backup revision ${approved.revision}. Existing remote metadata must be preserved. Confirm only if this entire local library belongs to your signed-in account.") },
             confirmButton = { TextButton(onClick = {
                 approvedUpdate = null
+                    approvedPreferences = null
                 run {
                     val revision = cloud.confirmUpdate(approved, confirmed = true)
                     cloudSummary = "Backup updated to revision $revision."
@@ -375,6 +386,34 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }, enabled = !busy) { Text("I own this library — back up") }
             },
             dismissButton = { TextButton(onClick = { approvedBackup = null }, enabled = !busy) { Text("Cancel") } })
+    }
+    approvedPreferences?.let { approved ->
+        AlertDialog(
+            onDismissRequest = { if (!busy) approvedPreferences = null },
+            title = { Text("Saved playback settings") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("On this device: repeat ${approved.local.repeat}, shuffle ${if (approved.local.shuffle) "on" else "off"}")
+                    val remote = approved.remote
+                    Text(if (remote == null) "Cloud: no complete playback settings saved" else
+                        "Cloud: repeat ${remote.repeat}, shuffle ${if (remote.shuffle) "on" else "off"}")
+                    Text("Restoration changes stored settings, not your songs. Stop playback first; verify them when you next start music.")
+                }
+            },
+            confirmButton = { TextButton(onClick = {
+                approvedPreferences = null
+                run { cloudSummary = "Playback settings saved at revision ${cloud.savePreferences(approved, confirmed = true)}." }
+            }, enabled = !busy && approved.local != approved.remote) { Text("Back up settings") } },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { approvedPreferences = null }, enabled = !busy) { Text("Cancel") }
+                    TextButton(onClick = {
+                        approvedPreferences = null
+                        run { cloud.restorePreferences(approved, confirmed = true); cloudSummary = "Saved settings restored. Verify after restarting playback." }
+                    }, enabled = !busy && approved.remote != null && approved.remote != approved.local) { Text("Restore") }
+                }
+            }
+        )
     }
     confirmLibraryAccount?.let { accountId ->
         AlertDialog(
