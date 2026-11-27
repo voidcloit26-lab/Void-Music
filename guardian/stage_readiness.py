@@ -33,18 +33,35 @@ def create_app():
         clerk_ok = True
     except Exception:
         pass
+    private_ok = False
+    public_ok = False
+    canonical = None
+    supplied = None
     try:
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric import ec
-        from guardian.device_protocol import b64
-        key = serialization.load_der_private_key(base64.b64decode(
-            os.environ["VOID_V2_LEASE_PRIVATE_B64"], validate=True), password=None)
+        raw = os.environ["VOID_V2_LEASE_PRIVATE_B64"].strip()
+        key = serialization.load_der_private_key(base64.b64decode(raw, validate=True), password=None)
         if isinstance(key, ec.EllipticCurvePrivateKey) and isinstance(key.curve, ec.SECP256R1):
-            public = b64(key.public_key().public_bytes(
-                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo))
-            signing_ok = hmac.compare_digest(public, os.environ["VOID_V2_LEASE_PUBLIC_KEY"])
+            private_ok = True
+            canonical = base64.urlsafe_b64encode(key.public_key().public_bytes(
+                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)).rstrip(b"=").decode("ascii")
     except Exception:
         pass
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        supplied = os.environ["VOID_V2_LEASE_PUBLIC_KEY"].strip()
+        der = base64.b64decode(supplied + "=" * (-len(supplied) % 4), altchars=b"-_", validate=True)
+        public = serialization.load_der_public_key(der)
+        public_ok = (isinstance(public, ec.EllipticCurvePublicKey)
+                     and isinstance(public.curve, ec.SECP256R1)
+                     and base64.urlsafe_b64encode(public.public_bytes(
+                         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+                     )).rstrip(b"=").decode("ascii") == supplied)
+    except Exception:
+        pass
+    signing_ok = bool(private_ok and public_ok and hmac.compare_digest(canonical, supplied))
 
     def application(env, start):
         if env.get("PATH_INFO") not in ("/", "/healthz") or env.get("QUERY_STRING"):
@@ -54,6 +71,7 @@ def create_app():
         return reply(start, "200 OK", {
             "status": "ready" if configured and clerk_ok and signing_ok else "configuration_required",
             "mode": "staging-readiness-only", "database_verified": configured,
-            "clerk_key_valid": clerk_ok, "signing_pair_valid": signing_ok,
+            "clerk_key_valid": clerk_ok, "signing_private_valid": private_ok,
+            "signing_public_valid": public_ok, "signing_pair_valid": signing_ok,
             "account_routes_enabled": False})
     return application
