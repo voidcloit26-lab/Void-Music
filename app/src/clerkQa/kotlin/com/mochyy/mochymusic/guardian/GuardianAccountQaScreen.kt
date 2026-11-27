@@ -77,6 +77,25 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         }
     }
 
+    fun signOutAccount() {
+        if (newRecovery != null) return
+        run {
+            if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
+            onSignOut()
+            recognizedOwner = false
+            businessOpen = false
+            result = null
+            key = ""
+            recovery = ""
+            newRecovery = null
+            leaseVerified = false
+            cloudSummary = null
+            approvedBackup = null
+            approvedRestore = null
+            approvedUpdate = null
+        }
+    }
+
     LaunchedEffect(client) {
         run {
             recognizedOwner = false
@@ -95,8 +114,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         return
     }
 
-    if (result?.optString("status") == "expired") {
-        GuardianExpiredMembership(busy, error) { entered ->
+    if (result?.optString("status") == "expired" && newRecovery == null) {
+        GuardianExpiredMembership(busy, error, onSignOut = if (newRecovery == null) ({ signOutAccount() }) else null) { entered ->
             run {
                 client.request("redeem_activation", mapOf("code" to entered))
                 refresh()
@@ -244,21 +263,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         }
         OutlinedButton(onClick = { run { refresh() } }, enabled = !busy) { Text("Refresh membership") }
         OutlinedButton(onClick = {
-            run {
-                if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
-                onSignOut()
-                recognizedOwner = false
-                businessOpen = false
-                result = null
-                key = ""
-                recovery = ""
-                newRecovery = null
-                leaseVerified = false
-                cloudSummary = null
-                approvedBackup = null
-                approvedRestore = null
-                approvedUpdate = null
-            }
+            signOutAccount()
         }, enabled = !busy && newRecovery == null) { Text("Sign out") }
     }
     if (confirmRecovery) AlertDialog(
