@@ -29,6 +29,7 @@ internal class GuardianVerifiedUpdater(
     private val app = context.applicationContext
     private val base = URL(origin)
     private val dir = File(app.filesDir, "guardian_verified_updates")
+    private val releaseState = GuardianReleaseState(app, releaseKey)
     init {
         require(base.protocol == "https" && base.host.isNotBlank() &&
             base.userInfo == null && base.query == null && base.ref == null &&
@@ -64,6 +65,7 @@ internal class GuardianVerifiedUpdater(
     private fun policy(payload: ByteArray, signature: ByteArray, now: Long, previous: SignedGuardianPolicy.Release?) =
         SignedGuardianPolicy.release(payload, signature, releaseKey, now, previous).also {
             require(it.latest > version(installed()))
+            check(releaseState.verifyAndRemember(payload, signature, now) == it)
         }
 
     private fun target(release: SignedGuardianPolicy.Release): File =

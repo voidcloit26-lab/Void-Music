@@ -30,6 +30,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var cloudSummary by remember(client) { mutableStateOf<String?>(null) }
     var approvedBackup by remember(client) { mutableStateOf<GuardianQaCloud.FirstBackup?>(null) }
     var approvedRestore by remember(client) { mutableStateOf<GuardianQaCloud.RestorePreview?>(null) }
+    var approvedUpdate by remember(client) { mutableStateOf<GuardianQaCloud.UpdatePreview?>(null) }
 
     suspend fun refresh() {
         result = client.request("status", emptyMap())
@@ -58,6 +59,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     cloudSummary = null
                     approvedBackup = null
                     approvedRestore = null
+                    approvedUpdate = null
                     if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
                 }
                 error = when (e.status) {
@@ -188,6 +190,13 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     run { approvedBackup = cloud.previewFirst(account.getString("account")) }
                 }, enabled = !busy && approvedBackup == null) { Text("Review first cloud backup") }
             }
+            if (status == "active") {
+                OutlinedButton(onClick = {
+                    run { approvedUpdate = cloud.previewUpdate(account.getString("account")) }
+                }, enabled = !busy && approvedBackup == null && approvedUpdate == null) {
+                    Text("Review backup update")
+                }
+            }
             OutlinedButton(onClick = {
                 run {
                     val preview = cloud.previewRestore(account.getString("account"))
@@ -248,6 +257,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 cloudSummary = null
                 approvedBackup = null
                 approvedRestore = null
+                approvedUpdate = null
             }
         }, enabled = !busy && newRecovery == null) { Text("Sign out") }
     }
@@ -269,6 +279,19 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         },
         dismissButton = { TextButton(onClick = { confirmRecovery = false }) { Text("Cancel") } }
     )
+    approvedUpdate?.let { approved ->
+        AlertDialog(onDismissRequest = { if (!busy) approvedUpdate = null },
+            title = { Text("Update saved library?") },
+            text = { Text("Upload additions to backup revision ${approved.revision}. Existing remote metadata must be preserved. Confirm only if this entire local library belongs to your signed-in account.") },
+            confirmButton = { TextButton(onClick = {
+                approvedUpdate = null
+                run {
+                    val revision = cloud.confirmUpdate(approved, confirmed = true)
+                    cloudSummary = "Backup updated to revision $revision."
+                }
+            }, enabled = !busy) { Text("Update my backup") } },
+            dismissButton = { TextButton(onClick = { approvedUpdate = null }, enabled = !busy) { Text("Cancel") } })
+    }
     approvedRestore?.let { approved ->
         AlertDialog(onDismissRequest = { if (!busy) approvedRestore = null },
             title = { Text("Restore saved library?") },
