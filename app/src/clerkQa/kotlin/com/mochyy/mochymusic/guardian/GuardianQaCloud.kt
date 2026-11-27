@@ -88,8 +88,15 @@ internal class GuardianQaCloud(
         val remote = client.request("cloud_read", emptyMap())
         val revision = remote.getLong("revision")
         require(revision > 0L && !remote.isNull("library"))
-        val remoteMetadata = CloudMetadata.parse(remoteBody(remote))
-        val local = GuardianCloudSnapshot.capture(database)
+        val existing = remoteBody(remote)
+        val remoteMetadata = CloudMetadata.parse(existing)
+        // Preserve validated remote preferences unchanged during a music-only update.
+        // The device preferences are shared; do not upload or apply them automatically.
+        val rawPreferences = requireNotNull(existing["preferences"] as? Map<*, *>)
+        val remotePreferences = rawPreferences.entries.associate { (key, value) ->
+            requireNotNull(key as? String) to value
+        }
+        val local = GuardianCloudSnapshot.capture(database, preferences = remotePreferences)
         val localMetadata = CloudMetadata.parse(local.body)
         check(local.excludedEntries == 0 && localMetadata.additiveTo(remoteMetadata)) {
             "Review library conflicts before backup"
