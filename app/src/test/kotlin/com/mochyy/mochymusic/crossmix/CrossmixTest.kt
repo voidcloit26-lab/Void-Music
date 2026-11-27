@@ -440,6 +440,23 @@ class CrossmixTest {
         }
     }
 
+    @Test
+    fun `unmatched fallbacks respect default overlap cap`() {
+        val outgoing = CrossmixTrackInput("x", 240_000L, null, null)
+        val incoming = CrossmixTrackInput("y", 0L, null, null)
+        for (alwaysMix in listOf(false, true)) {
+            val plan = CrossmixPlanner.plan(outgoing, incoming, CrossmixSettings(alwaysMix = alwaysMix))
+            assertFalse(plan.beatMatched)
+            val duration = plan.lengthBeats * plan.outBeatMs
+            assertTrue("unmatched fallback: ${duration}ms", duration <= 8_500.0)
+            if (alwaysMix) {
+                assertTrue(plan.style.blendsBoth)
+                assertTrue(duration >= 6_000.0)
+            }
+            assertTrue(plan.outMediaAt(plan.lengthBeats.toFloat()) <= outgoing.durationMs)
+        }
+    }
+
     // -- styles: every transition must start and end clean ----------------------------------
 
     @Test
