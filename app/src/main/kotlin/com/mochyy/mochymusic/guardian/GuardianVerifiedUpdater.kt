@@ -58,6 +58,7 @@ internal class GuardianVerifiedUpdater(
         val current = installed()
         val candidate = requireNotNull(app.packageManager.getPackageArchiveInfo(file.absolutePath, flags()))
         require(candidate.packageName == app.packageName && version(candidate) == release.latest)
+        require(candidate.versionName == release.versionName) { "APK version name mismatch" }
         require(version(candidate) > version(current))
         require(signer(current) == release.signerSha256 && signer(candidate) == release.signerSha256)
     }
@@ -75,7 +76,9 @@ internal class GuardianVerifiedUpdater(
 
     private fun policy(payload: ByteArray, signature: ByteArray, now: Long, previous: SignedGuardianPolicy.Release?) =
         SignedGuardianPolicy.release(payload, signature, releaseKey, now, previous).also {
-            require(it.latest > version(installed()))
+            val current = installed()
+            require(it.latest > version(current))
+            require(signer(current) == it.signerSha256) { "Unexpected installed signing certificate" }
             check(releaseState.verifyAndRemember(payload, signature, now) == it)
         }
 
