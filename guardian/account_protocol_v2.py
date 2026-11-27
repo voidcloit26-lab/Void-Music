@@ -44,6 +44,7 @@ ACTIONS = {
     "cloud_read": set(),
     "cloud_write": {"revision", "library"},
     "cloud_clear": {"revision"},
+    "release_policy": set(),
 }
 MAX_BODY = 600 * 1024
 
@@ -70,13 +71,14 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
         self.activation_codes = activation_codes
         self.profile_lookup = profile_lookup
         self.owner_bootstrap = owner_bootstrap
+        self.release_registry = release_registry
         self.max_pending = max_pending
         self.pending = {}
         self.lock = threading.Lock()
@@ -85,6 +87,8 @@ class AccountProtocol:
         session = self.verifier.verify(token)
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
+        if action == "release_policy" and self.release_registry is None:
+            raise MembershipDenied("release checks disabled")
         # Except for registration and recovery, only the current linked device may allocate challenges.
         if action in ("register_with_code", "redeem_activation") and self.activation_codes is None:
             raise MembershipDenied("activation upgrade disabled")
@@ -166,6 +170,17 @@ class AccountProtocol:
         # Resolve again after proof; store operations recheck registered device
         # in their own transaction, so a concurrent recovery cannot reuse it.
         account = self.store.resolve(session.issuer, session.subject, fingerprint)
+        if action == "release_policy":
+            if self.release_registry is None:
+                raise MembershipDenied("release checks disabled")
+            # Only linked devices, including expired members, may check for an update.
+            # A missing policy is unavailable, not an instruction to lock the app.
+            release = self.release_registry.current()
+            if release is None:
+                raise MembershipDenied("release policy unavailable")
+            payload, signature = release
+            self.store.resolve(session.issuer, session.subject, fingerprint)
+            return {"payload": b64(payload), "signature": b64(signature), "server_time": self.store._now()}
         if action == "rotate_recovery":
             return {"recovery": self.store.rotate_linked_recovery(session.issuer, session.subject, fingerprint)}
         if action == "lease":
