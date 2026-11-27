@@ -20,7 +20,7 @@ internal class GuardianQaCloud(
     private val client: GuardianAccountClient,
     private val ownsLibrary: (String) -> Boolean,
     private val isCurrent: () -> Boolean
-) {
+) : GuardianAutomaticSync.Port {
     private val settings = context.applicationContext.dataStore
     data class FirstBackup(val account: String, val preview: GuardianCloudSnapshot.Preview)
     data class UpdatePreview(val account: String, val revision: Long, val remoteDigest: String, val local: GuardianCloudSnapshot.Preview)
@@ -183,7 +183,7 @@ internal class GuardianQaCloud(
 
     /** Opt-in only after an exact, fully eligible local/remote match.
      * No implicit initial upload, restore, deletion or preference changes. */
-    suspend fun prepareAutomatic(account: String): CloudSyncPolicy.Baseline {
+    override suspend fun prepareAutomatic(account: String): CloudSyncPolicy.Baseline {
         requireAccount(account, active = true)
         val remote = client.request("cloud_read", emptyMap())
         val revision = remote.getLong("revision")
@@ -198,7 +198,7 @@ internal class GuardianQaCloud(
         return CloudSyncPolicy.Baseline(account, revision, digest)
     }
 
-    suspend fun automaticPass(account: String, baseline: CloudSyncPolicy.Baseline): CloudSyncPolicy.Baseline {
+    override suspend fun automaticPass(account: String, baseline: CloudSyncPolicy.Baseline): CloudSyncPolicy.Baseline {
         requireAccount(account, active = true)
         check(baseline.account == account)
         val remote = client.request("cloud_read", emptyMap())
