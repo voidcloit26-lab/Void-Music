@@ -26,6 +26,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.clerk.api.Clerk
@@ -78,10 +81,12 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
     val user by Clerk.userFlow.collectAsState()
     val activeSession by Clerk.sessionFlow.collectAsState()
     val initializationError by Clerk.initializationError.collectAsState()
+    var showEmail by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
             !initialized && initializationError != null -> Text("Authentication unavailable. Reopen the app to retry.")
             !initialized -> CircularProgressIndicator()
+            (user == null || activeSession == null) && !showEmail -> GuardianLoginLanding { showEmail = true }
             user == null || activeSession == null -> Column(
                 Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -113,6 +118,7 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
                 }
                 Column(Modifier.widthIn(max = 480.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
                     GuardianBrandHeader("VOID Music", "Your music. Your account.")
+                    TextButton(onClick = { showEmail = false }) { Text("Other sign-in options") }
                 }
                 Box(Modifier.weight(1f).widthIn(max = 480.dp).fillMaxWidth()) {
                     AuthView(clerkTheme = theme, isDismissible = false)
