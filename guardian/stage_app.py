@@ -8,6 +8,7 @@ from guardian.account_protocol_v2 import AccountProtocol
 from guardian.durable_challenges import DurableChallenges
 from guardian.shared_budget import SharedBudget
 from guardian.stage_signing import load_signing_pair
+from guardian.stage_account_guard import AccountFairness, authorize_request
 
 
 def create_app():
@@ -22,6 +23,7 @@ def create_app():
         store = StageStore(os.environ['VOID_V2_STAGE_DATABASE_URL'],
             bytes.fromhex(os.environ['VOID_V2_STAGE_PEPPER']), issuer=issuer)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store))
+        fairness = AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
     except Exception:
         raise RuntimeError('V2 staging configuration or database validation failed') from None
@@ -33,5 +35,10 @@ def create_app():
             return AccountAPI.reply(start,'405 Method Not Allowed',{'error':'method_not_allowed'})
         if env.get('HTTP_ORIGIN') or env.get('HTTP_COOKIE'):
             return AccountAPI.reply(start,'403 Forbidden',{'error':'access_denied'})
+        if (env.get('PATH_INFO') in ('/v2/challenge', '/v2/execute')
+                and env.get('REQUEST_METHOD') == 'POST' and not env.get('QUERY_STRING')):
+            denied = authorize_request(env, verifier, fairness)
+            if denied is not None:
+                return AccountAPI.reply(start, *denied)
         return api(env,start)
     return application
