@@ -180,4 +180,46 @@ internal class GuardianQaCloud(
             check(isCurrent() && ownsLibrary(approved.account))
         }
     }
+
+    /** Opt-in only after an exact, fully eligible local/remote match.
+     * No implicit initial upload, restore, deletion or preference changes. */
+    suspend fun prepareAutomatic(account: String): CloudSyncPolicy.Baseline {
+        requireAccount(account, active = true)
+        val remote = client.request("cloud_read", emptyMap())
+        val revision = remote.getLong("revision")
+        require(revision in 1 until Long.MAX_VALUE && !remote.isNull("library")) { "Review a manual backup first" }
+        val body = remoteBody(remote)
+        val digest = CloudMetadata.parse(body).digest()
+        val local = GuardianCloudSnapshot.capture(database, preferences = prefsOf(body))
+        check(local.excludedEntries == 0 && CloudMetadata.parse(local.body).digest() == digest) {
+            "Local and cloud libraries must match before enabling sync"
+        }
+        check(isCurrent() && ownsLibrary(account))
+        return CloudSyncPolicy.Baseline(account, revision, digest)
+    }
+
+    suspend fun automaticPass(account: String, baseline: CloudSyncPolicy.Baseline): CloudSyncPolicy.Baseline {
+        requireAccount(account, active = true)
+        check(baseline.account == account)
+        val remote = client.request("cloud_read", emptyMap())
+        val revision = remote.getLong("revision")
+        require(revision in 1 until Long.MAX_VALUE && !remote.isNull("library"))
+        val body = remoteBody(remote)
+        val local = GuardianCloudSnapshot.capture(database, preferences = prefsOf(body))
+        val evaluation = CloudSyncEvaluation.evaluate(account, true, baseline, revision, body,
+            local.body, local.excludedEntries)
+        check(isCurrent() && ownsLibrary(account))
+        return when (evaluation.action) {
+            CloudSyncPolicy.Action.CURRENT -> baseline
+            CloudSyncPolicy.Action.UPLOAD -> {
+                // Reject a concurrent local mutation before issuing a single CAS write.
+                check(GuardianCloudSnapshot.capture(database, preferences = prefsOf(body)) == local)
+                check(isCurrent() && ownsLibrary(account))
+                val response = client.request("cloud_write", mapOf("revision" to revision, "library" to local.body))
+                check(isCurrent() && ownsLibrary(account))
+                CloudSyncEvaluation.confirmed(account, evaluation, response.getLong("revision"))
+            }
+            else -> error("Library changed; manual review required")
+        }
+    }
 }
