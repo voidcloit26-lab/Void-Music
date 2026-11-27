@@ -117,7 +117,7 @@ internal fun ClerkGuardianQaHost(origin: String, gateEntry: Boolean = false) {
                     onDispose { lease.close() }
                 }
                 val cloud = remember(client, context.applicationContext) {
-                    GuardianQaCloud((context.applicationContext as App).musicDatabase, client,
+                    GuardianQaCloud(context.applicationContext, (context.applicationContext as App).musicDatabase, client,
                         ownsLibrary = { account ->
                             GuardianLocalLibraryOwner.status(context.applicationContext, account) == LocalLibraryBinding.Status.MATCH
                         }) {
