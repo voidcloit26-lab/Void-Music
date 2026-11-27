@@ -85,11 +85,12 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
                 }
                 error = when (e.status) {
-                    401 -> "Sign in again to continue."
+                    401 -> "Your session or verified email could not be confirmed. Refresh first; switch accounts only if the problem persists. (G401)"
                     403 -> "Access was not verified. Check the account or recovery code."
                     400 -> "Account request is incompatible. Refresh or contact VOID support."
                     409 -> "The account state changed. Refresh before retrying."
                     429 -> "Too many requests. Try again later."
+                    503 -> "Guardian could not verify your identity right now. Your sign-in may still be valid. Refresh before retrying. (G503)"
                     else -> "Guardian is unavailable. Refresh before retrying."
                 }
             } catch (_: Exception) {
@@ -170,12 +171,10 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         return
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("VOID MUSIC", style = MaterialTheme.typography.headlineMedium)
-        Text("Account and membership · QA only", style = MaterialTheme.typography.labelLarge)
+    GuardianAccountLayout {
+        GuardianBrandHeader("Your account", "Membership & security")
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
+        if (error.isNotEmpty()) GuardianAccountNotice(error)
         val account = result
         if (account != null) {
             Text("VOID account", style = MaterialTheme.typography.titleMedium)
