@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import com.clerk.api.Clerk
 import com.clerk.api.network.serialization.ClerkResult
 import com.mochyy.mochymusic.BuildConfig
+import com.mochyy.mochymusic.App
 import com.clerk.ui.auth.AuthView
 
 /**
@@ -91,7 +92,12 @@ internal fun ClerkGuardianQaHost(origin: String) {
                     lease.clear()
                     onDispose { lease.close() }
                 }
-                GuardianAccountQaScreen(client, lease, onSignOut = {
+                val cloud = remember(client, context.applicationContext) {
+                    GuardianQaCloud((context.applicationContext as App).musicDatabase, client) {
+                        Clerk.userFlow.value?.id == subject && Clerk.session?.id == sid
+                    }
+                }
+                GuardianAccountQaScreen(client, lease, cloud, onSignOut = {
                     lease.clear()
                     ClerkQaBridge.signOut()
                 })

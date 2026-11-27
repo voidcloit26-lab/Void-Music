@@ -14,7 +14,7 @@ import org.json.JSONObject
 
 /** Disconnected QA screen: no playback grant, no production payments. */
 @Composable
-internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, onSignOut: suspend () -> Unit) {
+internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, onSignOut: suspend () -> Unit) {
     val scope = rememberCoroutineScope()
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
     var recovery by remember(client) { mutableStateOf("") }
@@ -25,6 +25,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var confirmRecovery by remember(client) { mutableStateOf(false) }
     var leaseVerified by remember(client) { mutableStateOf(false) }
     var cloudSummary by remember(client) { mutableStateOf<String?>(null) }
+    var approvedBackup by remember(client) { mutableStateOf<GuardianQaCloud.FirstBackup?>(null) }
 
     suspend fun refresh() {
         result = client.request("status", emptyMap())
@@ -49,6 +50,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     lease.clear()
                     leaseVerified = false
                     cloudSummary = null
+                    approvedBackup = null
                 }
                 error = when (e.status) {
                     401 -> "Sign in again to continue."
@@ -130,7 +132,22 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }
             }, enabled = !busy) { Text("Inspect cloud backup") }
             cloudSummary?.let { Text(it) }
-            Text("Cloud inspection is read-only. No local library data is uploaded.")
+            if (status == "active") {
+                OutlinedButton(onClick = {
+                    run { approvedBackup = cloud.previewFirst(account.getString("account")) }
+                }, enabled = !busy && approvedBackup == null) { Text("Review first cloud backup") }
+            }
+            OutlinedButton(onClick = {
+                run {
+                    val preview = cloud.previewRestore(account.getString("account"))
+                    cloudSummary = if (preview == null) "No cloud backup yet" else
+                        "Restore preview: ${preview.plan.addFavorites.size} favorites, " +
+                        "${preview.plan.addPlaylists.size} playlists, " +
+                        "${preview.plan.missingTracks.size} missing tracks, " +
+                        "${preview.plan.conflictingPlaylists.size} conflicts. No changes made."
+                }
+            }, enabled = !busy && approvedBackup == null) { Text("Preview restore") }
+            Text("No automatic uploads, audio files or overwrites. Only confirm if all reviewed local metadata belongs to you.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else {
             Button(onClick = {
@@ -158,6 +175,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 newRecovery = null
                 leaseVerified = false
                 cloudSummary = null
+                approvedBackup = null
             }
         }, enabled = !busy && newRecovery == null) { Text("Sign out") }
     }
@@ -179,6 +197,34 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         },
         dismissButton = { TextButton(onClick = { confirmRecovery = false }) { Text("Cancel") } }
     )
+    approvedBackup?.let { approved ->
+        val favorites = approved.preview.body["favorites"] as? List<*> ?: emptyList<Any>()
+        val playlists = approved.preview.body["playlists"] as? List<*> ?: emptyList<Any>()
+        AlertDialog(onDismissRequest = { if (!busy) approvedBackup = null },
+            title = { Text("Confirm first cloud backup") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Account: ${approved.account}")
+                    Text("${favorites.size} favorites, ${playlists.size} playlists, ${approved.preview.excludedEntries} excluded entries.")
+                    Text("This sends eligible song IDs and playlist names/track IDs. Local audio and file paths are excluded.")
+                    Text("Confirm only if this entire local library belongs to you. Existing remote data cannot be overwritten.")
+                    playlists.take(100).forEach { item ->
+                        val name = (item as? Map<*, *>)?.get("name") as? String
+                        if (name != null) Text(name)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    approvedBackup = null
+                    run {
+                        val revision = cloud.confirmFirst(approved, confirmed = true)
+                        cloudSummary = "First backup saved at revision $revision."
+                    }
+                }, enabled = !busy) { Text("I own this library — back up") }
+            },
+            dismissButton = { TextButton(onClick = { approvedBackup = null }, enabled = !busy) { Text("Cancel") } })
+    }
     newRecovery?.let { value ->
         AlertDialog(onDismissRequest = {},
             title = { Text("Save your recovery code") },
