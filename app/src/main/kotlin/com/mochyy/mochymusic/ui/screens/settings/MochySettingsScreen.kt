@@ -151,7 +151,11 @@ private val LocalizedSettingsPages = mapOf(
     "Integrations" to R.string.integrations,
 )
 
+private const val VoidLuxuryRoute = "void_luxury_external"
+private const val VoidLuxuryUrl = "https://voidluxury.in/"
+
 private val SettingsIndex = listOf(
+    SettingsEntry("VOID Luxury", "Our brands", VoidLuxuryRoute, "clothing fashion streetwear t-shirts hoodies merchandise shop website voidluxury.in"),
     // Customisation
     SettingsEntry("Customisation", "Customisation", "customisation_settings", "customize cover rounding playlist player home styles gesture swipe blur animation lyrics"),
     SettingsEntry("Cover rounding", "Customisation", "customisation_settings", "square rounded corner radius px thumbnail art"),
@@ -283,9 +287,17 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
     val focusManager = LocalFocusManager.current
     val sheets = com.mochyy.mochymusic.ui.component.LocalZoomOutOverlayState.current
     val devices = com.mochyy.mochymusic.ui.screens.devices.rememberDevicesLink()
+    val context = LocalContext.current
     // on a wide screen the list stays put and its pages open beside it; device integration is a sheet over either
     val open: (String) -> Unit = { route ->
         when {
+            route == VoidLuxuryRoute -> {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(VoidLuxuryUrl))
+                intent.addCategory(android.content.Intent.CATEGORY_BROWSABLE)
+                runCatching { context.startActivity(intent) }.onFailure {
+                    android.widget.Toast.makeText(context, "Open voidluxury.in in your browser", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
             route == com.mochyy.mochymusic.ui.screens.devices.DeviceIntegrationRoute -> sheets.showDeviceIntegration(devices)
             pane != null -> navController.openSettingsPage(route)
             else -> navController.navigate(route)
@@ -308,7 +320,6 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
         focusManager.clearFocus()
     }
 
-    val context = LocalContext.current
     // picked again each time the list opens, so a tip that was just followed stops showing
     val recommendations = remember(context) { pickRecommendations(context) }
     val results = remember(query.text, context) {
@@ -385,7 +396,7 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                                     .clip(RoundedCornerShape(20.dp))
                                     .background(BubbleColor)
                                     .clickable {
-                                        SettingsHighlight.pending = entry.highlightKey
+                                        if (entry.route != VoidLuxuryRoute) SettingsHighlight.pending = entry.highlightKey
                                         open(entry.route)
                                     }
                                     .padding(horizontal = 16.dp, vertical = 14.dp)
@@ -436,6 +447,8 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                         .graphicsLayer { alpha = contentAlpha }
                 ) {
                     RecommendedCard(recommendations = recommendations, open = open)
+                    Spacer(modifier = Modifier.height(14.dp))
+                    VoidLuxuryCard(onClick = { open(VoidLuxuryRoute) }, modifier = Modifier.padding(horizontal = 20.dp))
 
                     // a build without the module feed (most forks) has no store to open
                     if (ModuleFeed.FeedUrl.isNotBlank()) {
@@ -683,5 +696,42 @@ internal fun CategoryBubble(
                 color = Color.White,
             )
         }
+    }
+}
+
+/** Bundled brand entry; no background network requests or embedded checkout. */
+@Composable
+private fun VoidLuxuryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFF201C18))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF111111)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_void_luxury),
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("OUR BRANDS", fontFamily = InterFontFamily, fontSize = 10.sp,
+                fontWeight = FontWeight.Medium, color = Color(0xFFC9AA77))
+            Text("VOID LUXURY", fontFamily = InterFontFamily, fontSize = 19.sp,
+                fontWeight = FontWeight.Bold, color = Color(0xFFF4E6D0))
+            Text("Explore our streetwear collection", fontFamily = InterFontFamily,
+                fontSize = 13.sp, color = Color.White.copy(alpha = 0.72f))
+            Text("Visit voidluxury.in", fontFamily = InterFontFamily,
+                fontSize = 12.sp, color = Color(0xFFC9AA77))
+        }
+        Text("↗", fontSize = 19.sp, color = Color(0xFFC9AA77))
     }
 }
