@@ -2,9 +2,15 @@
 Never expose the backend secret to the Android app or follow HTTP redirects.
 """
 import json
+import logging
+from urllib.error import HTTPError
 import re
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 from guardian.clerk_session import SessionDenied
+
+class ProfileUnavailable(RuntimeError):
+    """Backend identity lookup failed; this does not invalidate the user's JWT."""
+
 
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -32,8 +38,13 @@ class ClerkProfileLookup:
                 profile=json.loads(raw)
                 if not isinstance(profile,dict) or profile.get("id")!=subject:
                     raise ValueError("profile mismatch")
-        except Exception:
-            raise SessionDenied("identity verification unavailable") from None
+        except HTTPError as exc:
+            # Record status only: never log credentials, user identifiers, URLs or response bodies.
+            logging.getLogger(__name__).warning("Clerk profile lookup HTTP status=%s", exc.code)
+            raise ProfileUnavailable("identity verification unavailable") from None
+        except Exception as exc:
+            logging.getLogger(__name__).warning("Clerk profile lookup failed (%s)", type(exc).__name__)
+            raise ProfileUnavailable("identity verification unavailable") from None
         return profile
 
 def verified_primary_email(subject, profile):
