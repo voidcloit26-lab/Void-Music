@@ -184,6 +184,9 @@ extensions.configure<ApplicationExtension> {
             "V2 staging gate requires Clerk enabled and V1 disabled"
         }
         buildConfigField("Boolean", "VOID_GUARDIAN_V2_ENFORCED", guardianV2Enforced.toString())
+        manifestPlaceholders["voidAllowBackup"] = (!guardianV2Enforced).toString()
+        manifestPlaceholders["voidFullBackupContent"] = if (guardianV2Enforced) "@xml/guardian_no_backup_rules" else "@xml/backup_rules"
+        manifestPlaceholders["voidDataExtractionRules"] = if (guardianV2Enforced) "@xml/guardian_no_data_transfer" else "@xml/data_extraction_rules"
         buildConfigField("Boolean", "VOID_GUARDIAN_ENFORCED", guardianEnforced.toString())
         buildConfigField("String", "VOID_GUARDIAN_ORIGIN", "\"$guardianOrigin\"")
         buildConfigField("String", "VOID_GUARDIAN_PUBLIC_KEY", "\"$guardianPublicKey\"")
