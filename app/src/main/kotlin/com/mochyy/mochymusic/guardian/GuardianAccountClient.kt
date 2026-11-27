@@ -1,6 +1,8 @@
 package com.mochyy.mochymusic.guardian
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -24,7 +26,10 @@ internal class GuardianAccountClient(
     class Session(val token: String, val subject: String, val sessionId: String)
     class RequestFailed(val status: Int) : Exception("Guardian request failed ($status)")
     private val base = URL(origin)
-    private val lock = Mutex()
+    // The server allows only one outstanding challenge per account/device.
+    // UI, playback refresh and cloud sync construct separate clients, so an
+    // instance-local mutex cannot prevent contention.
+    private companion object { val deviceRequestLock = Mutex() }
 
     init {
         require(base.protocol == "https" && base.host.isNotBlank() &&
@@ -33,7 +38,7 @@ internal class GuardianAccountClient(
     }
 
     suspend fun request(action: String, body: Map<String, Any?>): JSONObject =
-        lock.withLock {
+        deviceRequestLock.withLock {
             withContext(Dispatchers.IO) {
                 // Snapshot the exact request before the challenge; caller mutations
                 // cannot alter the body after it has been signed.
@@ -46,6 +51,7 @@ internal class GuardianAccountClient(
                 val canonical = AccountProofV2.canonicalBody(action, snapshot)
                 val challengeBody = JSONObject().put("public_key", key)
                     .put("action", action).put("body", JSONObject(canonical))
+                currentCoroutineContext().ensureActive()
                 val challenge = post("/v2/challenge", auth.token, challengeBody)
                 val nonce = challenge.getString("nonce")
                 val proof = DeviceEntitlement.signAccountRequest(nonce, auth.sessionId,
@@ -58,7 +64,9 @@ internal class GuardianAccountClient(
                     .put("body", JSONObject(canonical)).put("nonce", nonce).put("signature", proof)
                 // No automatic retry of a mutation: a lost response may have
                 // committed the operation. Refresh state before retrying.
+                currentCoroutineContext().ensureActive()
                 val response = post("/v2/execute", refreshed.token, execution)
+                currentCoroutineContext().ensureActive()
                 val after = checkedSession()
                 check(after.subject == auth.subject && after.sessionId == auth.sessionId)
                 response
