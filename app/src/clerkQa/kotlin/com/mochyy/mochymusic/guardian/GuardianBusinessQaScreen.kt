@@ -1,11 +1,14 @@
 package com.mochyy.mochymusic.guardian
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -15,6 +18,8 @@ import org.json.JSONObject
 @Composable
 internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var copyFeedback by remember(client) { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var summary by remember { mutableStateOf<JSONObject?>(null) }
@@ -38,17 +43,18 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
             catch (e: GuardianAccountClient.RequestFailed) {
                 error = if (e.status in listOf(401,403)) "Owner access requires a verified owner account and fresh MFA. Reauthenticate, then retry."
                     else "Guardian Business unavailable. Refresh before retrying."
-                if (e.status in listOf(401,403)) { summary = null; codes = emptyList(); list = null; member = null }
+                if (e.status in listOf(401,403)) { summary = null; codes = emptyList(); list = null; member = null; confirmation = null; copyFeedback = "" }
             } catch (_: Exception) { error = "Unable to complete request. Check the connection and refresh." }
             finally { busy = false }
         }
     }
+    BackHandler(enabled = codes.isNotEmpty()) { /* Acknowledge the one-time codes first. */ }
     LaunchedEffect(client) { run { summary = client.request("summary") } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("GUARDIAN BUSINESS", style = MaterialTheme.typography.headlineMedium)
         Text("Owner access · staging")
-        TextButton(onClick = back, enabled = !busy) { Text("Back") }
+        TextButton(onClick = back, enabled = !busy && codes.isEmpty()) { Text("Back") }
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (error.isNotEmpty()) Text(error,color=MaterialTheme.colorScheme.error)
         OutlinedButton(onClick = { run { summary = client.request("summary") } },enabled=!busy) { Text("Refresh") }
@@ -106,8 +112,19 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
         }
     }
     if(codes.isNotEmpty()) AlertDialog(onDismissRequest={},title={Text("Save activation codes")},
-        text={Column(Modifier.verticalScroll(rememberScrollState())) { Text("Shown once. Share each code privately with its intended member.");codes.forEach{Text(it)} }},
-        confirmButton={TextButton(onClick={codes=emptyList()}){Text("Done")}})
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+        text={Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Shown once. Share each code privately with its intended member. Clipboard copies are sensitive; avoid shared clipboard or keyboards.")
+            codes.forEachIndexed { index, value ->
+                Text("Code ${index+1}")
+                Text(value)
+                OutlinedButton(onClick = {
+                    copyFeedback = if (GuardianSecretClipboard.copy(context, value)) "Code ${index+1} copied." else "Copy unavailable."
+                }) { Text("Copy code ${index+1}") }
+            }
+            if (copyFeedback.isNotEmpty()) Text(copyFeedback)
+        }},
+        confirmButton={TextButton(onClick={codes=emptyList();copyFeedback=""}){Text("I saved the codes")}})
     confirmation?.let { action ->
         AlertDialog(onDismissRequest={confirmation=null},title={Text("Confirm owner action")},
             text={Text("This changes membership or activation state. Continue?")},
