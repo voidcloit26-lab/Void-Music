@@ -126,6 +126,8 @@ internal fun ClerkGuardianQaHost(origin: String, gateEntry: Boolean = false) {
                 }
                 val business = remember(subject, sid) { GuardianBusinessQaClient(subject,sid) }
                 GuardianAccountQaScreen(client, lease, cloud, business, gateEntry, onSignOut = {
+                    // Invalidate playback and in-flight sync before remote sign-out.
+                    GuardianV2Runtime.clear(context.applicationContext)
                     lease.clear()
                     ClerkQaBridge.signOut()
                 })
