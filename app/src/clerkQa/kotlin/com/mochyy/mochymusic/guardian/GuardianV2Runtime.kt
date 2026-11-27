@@ -46,6 +46,7 @@ internal object GuardianV2Runtime {
             binding=null
             runCatching { cache(context).clear() }
         }
+        GuardianAutomaticSync.disable()
         GuardianGate.changed()
     }
 
@@ -91,7 +92,21 @@ internal object GuardianV2Runtime {
         val b=binding ?: return false
         if(!current(b)){clear(context);return false}
         val client=GuardianAccountClient(origin,{ClerkQaBridge.currentSession()},b.subject,b.session)
-        return authorize(context,client,b.account)
+        val refreshed = authorize(context,client,b.account)
+        if (refreshed) GuardianAutomaticSync.schedule(b.account)
+        return refreshed
+    }
+
+    suspend fun enableAutomaticSync(context: Context, account: String): Boolean = withContext(Dispatchers.IO) {
+        val app = context.applicationContext
+        val b = binding ?: return@withContext false
+        if (b.account != account || !allowed(app)) return@withContext false
+        val active = { binding == b && current(b) && allowed(app) }
+        val client = GuardianAccountClient(origin, { ClerkQaBridge.currentSession() }, b.subject, b.session)
+        val cloud = GuardianQaCloud(app, (app as com.mochyy.mochymusic.App).musicDatabase, client,
+            ownsLibrary = { id -> GuardianLocalLibraryOwner.status(app, id) == LocalLibraryBinding.Status.MATCH },
+            isCurrent = active)
+        GuardianAutomaticSync.enable(account, cloud, active)
     }
 
     fun openMusic(context:Context) {
