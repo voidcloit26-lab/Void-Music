@@ -5,6 +5,9 @@ methods, and an independently verified owner before calling administrative metho
 A registration, code redemption and membership grant share one transaction.
 """
 import secrets
+import hmac
+import hashlib
+import re
 from guardian.membership_rules import MembershipDenied, grant
 from guardian.business_store import BusinessDenied
 
@@ -17,8 +20,9 @@ DDL = """CREATE TABLE IF NOT EXISTS activation_codes_v2 (
 
 
 class ActivationCodes:
-    def __init__(self, store):
+    def __init__(self, store, *, issuer=None):
         self.store = store
+        self.issuer = issuer or getattr(store, 'issuer', None)
 
     def issue(self, credential, kind, *, days=None, ttl=604800, subject=None, count=1):
         actor = self.store._owner(credential)
@@ -36,7 +40,9 @@ class ActivationCodes:
         # Only a trusted server-side subject resolver may supply a verified subject.
         # The owner role does not need SELECT on external identity records.
         if subject is not None:
-            identity = self.store._identity(self.store.issuer, subject)
+            if not isinstance(self.issuer,str) or not isinstance(subject,str) or not re.fullmatch(r'user_[A-Za-z0-9]{1,120}',subject):
+                raise ValueError('verified subject required')
+            identity = hmac.digest(self.store.pepper, ('clerk-v1:'+self.issuer+':'+subject).encode('ascii'), hashlib.sha256)
         else:
             identity = None
         codes = [secrets.token_urlsafe(32) for _ in range(count)]

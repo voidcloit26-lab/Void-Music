@@ -23,6 +23,7 @@ from guardian.membership_rules import MembershipDenied
 from guardian.external_identity_store import ExternalIdentityStore
 from guardian.cloud_store import CloudStore
 from guardian.durable_challenges import DurableChallenges, ChallengeDenied
+from guardian.clerk_profile import verified_primary_email
 
 
 class LinkedCloudStore(ExternalIdentityStore, CloudStore):
@@ -67,11 +68,12 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
         self.activation_codes = activation_codes
+        self.profile_lookup = profile_lookup
         self.max_pending = max_pending
         self.pending = {}
         self.lock = threading.Lock()
@@ -133,6 +135,9 @@ class AccountProtocol:
         if action == "register_with_code":
             if self.activation_codes is None:
                 raise MembershipDenied("activation upgrade disabled")
+            if self.profile_lookup is None:
+                raise MembershipDenied("verified onboarding unavailable")
+            verified_primary_email(session.subject, self.profile_lookup(session.subject))
             account, recovery, member = self.activation_codes.register(session.issuer, session.subject, fingerprint, body["code"])
             return {"account":account,"recovery":recovery,"membership":asdict(member),"status":member.status(self.store._now())}
         if action == "redeem_activation":
