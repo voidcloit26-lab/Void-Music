@@ -7,6 +7,7 @@ from contextlib import closing
 import json
 import re
 import sqlite3
+import secrets
 from guardian.identity_store import IdentityStore
 from guardian.membership_rules import MembershipDenied
 
@@ -92,6 +93,51 @@ class CloudStore(IdentityStore):
                 raise RevisionConflict("refresh library before saving")
             db.execute("INSERT INTO cloud_library_v2 VALUES (?,?,?,?) ON CONFLICT(account) DO UPDATE SET revision=excluded.revision,payload=excluded.payload,updated_at=excluded.updated_at",(account,revision+1,payload,now))
             return revision+1
+
+    def backup_for_upgrade(self, account, verified_device, expected_revision, data):
+        """Atomically save reviewed metadata and rotate the single-use device
+        recovery credential. This does not authorize playback or alter membership.
+        A failed write leaves the prior backup and recovery credential unchanged.
+        """
+        if type(expected_revision) is not int or not 0 <= expected_revision < 2**63-1:
+            raise ValueError("invalid revision")
+        account, device = self._account(account), self._device(verified_device)
+        payload = normalize(data)
+        replacement = secrets.token_urlsafe(32)
+        with self.transaction() as db:
+            self._require_device(db, account, device)
+            member = self._membership(db, account)
+            now = self._now()
+            if member is None or member.status(now) != "active":
+                raise MembershipDenied("active membership required")
+            row = db.execute("SELECT revision,payload FROM cloud_library_v2 WHERE account=?", (account,)).fetchone()
+            revision = row[0] if row else 0
+            if revision != expected_revision:
+                raise RevisionConflict("review library before saving")
+            # Do not silently replace the cloud library with an older or partial
+            # device snapshot. Existing playlist order and preferences are preserved.
+            if row:
+                old = json.loads(row[1])
+                new = json.loads(payload)
+                if not set(old["favorites"]).issubset(new["favorites"]):
+                    raise RevisionConflict("review favorite conflicts")
+                incoming = {p["id"]: p for p in new["playlists"]}
+                for playlist in old["playlists"]:
+                    target = incoming.get(playlist["id"])
+                    if target is None or target["name"] != playlist["name"]:
+                        raise RevisionConflict("review playlist conflicts")
+                    remaining = iter(target["tracks"])
+                    if not all(any(track == current for current in remaining) for track in playlist["tracks"]):
+                        raise RevisionConflict("review playlist track conflicts")
+                if any(new["preferences"].get(k) != v for k,v in old["preferences"].items()):
+                    raise RevisionConflict("review preference conflicts")
+            if not row or row[1] != payload:
+                revision += 1
+                db.execute("INSERT INTO cloud_library_v2 VALUES (?,?,?,?) ON CONFLICT(account) DO UPDATE SET revision=excluded.revision,payload=excluded.payload,updated_at=excluded.updated_at",
+                           (account, revision, payload, now))
+            db.execute("UPDATE accounts_v2 SET recovery=? WHERE id=? AND device=?",
+                       (self._digest("recovery", replacement), account, device))
+            return revision, replacement
 
     def clear_library(self,account,verified_device,expected_revision):
         # Keep a revisioned empty snapshot so stale offline writes cannot resurrect it.
