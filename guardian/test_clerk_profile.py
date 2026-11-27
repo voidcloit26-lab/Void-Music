@@ -1,5 +1,7 @@
 import unittest
-from guardian.clerk_profile import ClerkProfileLookup, verified_primary_email
+from unittest.mock import patch
+from urllib.error import HTTPError, URLError
+from guardian.clerk_profile import ClerkProfileLookup, verified_primary_email, ProfileUnavailable
 from guardian.clerk_session import SessionDenied
 
 class ProfileTests(unittest.TestCase):
@@ -21,4 +23,22 @@ class ProfileTests(unittest.TestCase):
         with self.assertRaises(ValueError): ClerkProfileLookup("pk_test_not_secret")
         lookup=ClerkProfileLookup("sk_test_synthetic")
         with self.assertRaises(SessionDenied): lookup("../jwks")
+    def test_backend_rejection_is_not_user_signout(self):
+        lookup = ClerkProfileLookup("sk_test_synthetic")
+        with patch.object(lookup._opener, "open", side_effect=HTTPError("https://example.test", 401, "denied", {}, None)):
+            with self.assertLogs("guardian.clerk_profile", level="WARNING") as logs:
+                with self.assertRaises(ProfileUnavailable):
+                    lookup("user_test")
+            self.assertIn("401", logs.output[0])
+            self.assertNotIn("sk_test_", logs.output[0])
+            self.assertNotIn("user_test", logs.output[0])
+
+    def test_network_error_is_not_user_signout(self):
+        lookup = ClerkProfileLookup("sk_test_synthetic")
+        with patch.object(lookup._opener, "open", side_effect=URLError("private test URL")):
+            with self.assertLogs("guardian.clerk_profile", level="WARNING") as logs:
+                with self.assertRaises(ProfileUnavailable):
+                    lookup("user_test")
+            self.assertNotIn("private test URL", logs.output[0])
+
 if __name__=="__main__": unittest.main()
