@@ -1,5 +1,6 @@
 package com.mochyy.mochymusic.guardian
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,11 +17,19 @@ internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: 
     var page by remember { mutableStateOf("expired") }
     var code by remember { mutableStateOf("") }
     var linkError by remember { mutableStateOf("") }
+    var switchAccount by remember { mutableStateOf(false) }
     val uri = LocalUriHandler.current
     fun open(url: String) {
         linkError = ""
         runCatching { uri.openUri(url) }.onFailure {
             linkError = "Could not open Discord. Please open the link in your browser."
+        }
+    }
+    BackHandler(enabled = onSignOut != null || page != "expired") {
+        if (!busy) {
+            if (page != "expired") {
+                code = ""; linkError = ""; page = "expired"
+            } else if (onSignOut != null) switchAccount = true
         }
     }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -66,9 +75,21 @@ internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: 
                 TextButton(onClick = { linkError = ""; page = "expired" }) { Text("Back") }
             }
         }
-        if (onSignOut != null) {
-            TextButton(onClick = { code = ""; onSignOut() }, enabled = !busy,
-                modifier = Modifier.fillMaxWidth()) { Text("Sign out or switch account") }
+        if (onSignOut != null && page == "expired") {
+            Text("Use your device’s Back action to switch accounts.", style = MaterialTheme.typography.bodySmall)
         }
+    }
+    if (switchAccount && onSignOut != null) {
+        AlertDialog(
+            onDismissRequest = { switchAccount = false },
+            title = { Text("Switch account?") },
+            text = { Text("Sign out without changing your membership or deleting your library.") },
+            confirmButton = {
+                TextButton(onClick = { switchAccount = false; code = ""; onSignOut() }, enabled = !busy) {
+                    Text("Sign out")
+                }
+            },
+            dismissButton = { TextButton(onClick = { switchAccount = false }) { Text("Cancel") } }
+        )
     }
 }
