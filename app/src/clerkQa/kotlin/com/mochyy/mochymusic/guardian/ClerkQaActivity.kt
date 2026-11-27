@@ -26,7 +26,7 @@ class ClerkQaActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(Modifier.fillMaxSize()) {
                     if (initialized) {
-                        ClerkGuardianQaHost("https://void-guardian-v2-stage.onrender.com")
+                        ClerkGuardianQaHost("https://void-guardian-v2-stage.onrender.com", intent.getBooleanExtra("VOID_GATE_ENTRY", false))
                     } else {
                         Text("Staging authentication is unavailable. Close this page and retry.")
                     }

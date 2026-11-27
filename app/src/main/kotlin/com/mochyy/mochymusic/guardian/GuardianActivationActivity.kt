@@ -54,7 +54,7 @@ class GuardianActivationActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (GuardianGate.v2Enforced) {
-            startActivity(Intent(this, ClerkQaActivity::class.java))
+            startActivity(Intent(this, ClerkQaActivity::class.java).putExtra("VOID_GATE_ENTRY", true))
             finish()
             return
         }

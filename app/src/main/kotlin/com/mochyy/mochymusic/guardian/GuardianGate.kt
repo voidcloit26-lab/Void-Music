@@ -71,7 +71,7 @@ object GuardianGate {
     /** Do not preserve or replay untrusted launch intents after activation. */
     fun redirectIfLocked(activity: Activity): Boolean {
         if (isAllowed(activity)) return false
-        activity.startActivity(Intent(activity, if (v2Enforced) ClerkQaActivity::class.java else GuardianActivationActivity::class.java))
+        activity.startActivity(Intent(activity, if (v2Enforced) ClerkQaActivity::class.java else GuardianActivationActivity::class.java).putExtra("VOID_GATE_ENTRY", v2Enforced))
         activity.finish()
         return true
     }

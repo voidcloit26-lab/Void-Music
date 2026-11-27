@@ -14,7 +14,7 @@ import org.json.JSONObject
 
 /** Disconnected QA screen: no playback grant, no production payments. */
 @Composable
-internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, business: GuardianBusinessQaClient, onSignOut: suspend () -> Unit) {
+internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, business: GuardianBusinessQaClient, gateEntry: Boolean, onSignOut: suspend () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     var recognizedOwner by remember(client) { mutableStateOf(false) }
@@ -36,6 +36,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         if (result?.optString("status") != "active") {
             lease.clear()
             leaseVerified = false
+            if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
         }
     }
 
@@ -79,6 +80,11 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             recognizedOwner = false
             recognizedOwner = client.request("identity_role", emptyMap()).optString("role") == "owner"
             refresh()
+            val current = result
+            if (gateEntry && GuardianGate.v2Enforced && current?.optString("status") == "active") {
+                check(GuardianV2Runtime.authorize(context.applicationContext, client, current.getString("account")))
+                GuardianV2Runtime.openMusic(context)
+            }
         }
     }
 
@@ -114,6 +120,16 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 Text("Plan: " + it.optString("kind"))
                 if (!it.isNull("expires_at")) Text("Expires: " +
                     java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it.optLong("expires_at") * 1000L)))
+                if (!it.isNull("expires_at") && account.has("server_time")) {
+                    val level = runCatching { MembershipReminder.level(it.getLong("expires_at"), account.getLong("server_time"), status == "active") }.getOrNull()
+                    val notice = when (level) {
+                        MembershipReminder.Level.WEEK -> "Your membership expires within 7 days."
+                        MembershipReminder.Level.THREE_DAYS -> "Your membership expires within 3 days."
+                        MembershipReminder.Level.LAST_DAY -> "Your membership expires within 24 hours."
+                        else -> null
+                    }
+                    notice?.let { message -> Text(message, color = MaterialTheme.colorScheme.tertiary) }
+                }
             }
             if (status == "unactivated") {
                 OutlinedTextField(key, { key = it.take(43) }, label = { Text("Membership key") },

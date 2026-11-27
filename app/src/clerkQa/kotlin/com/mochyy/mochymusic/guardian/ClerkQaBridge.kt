@@ -70,7 +70,7 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
 /** Composes the registered account screen for an explicitly supplied QA origin.
  * Never invoke from the V1 playback gate; no real service is selected here. */
 @Composable
-internal fun ClerkGuardianQaHost(origin: String) {
+internal fun ClerkGuardianQaHost(origin: String, gateEntry: Boolean = false) {
     ClerkQaAuthScreen {
         val user by Clerk.userFlow.collectAsState()
         val activeSession by Clerk.sessionFlow.collectAsState()
@@ -98,7 +98,7 @@ internal fun ClerkGuardianQaHost(origin: String) {
                     }
                 }
                 val business = remember(subject, sid) { GuardianBusinessQaClient(subject,sid) }
-                GuardianAccountQaScreen(client, lease, cloud, business, onSignOut = {
+                GuardianAccountQaScreen(client, lease, cloud, business, gateEntry, onSignOut = {
                     lease.clear()
                     ClerkQaBridge.signOut()
                 })

@@ -178,8 +178,12 @@ class AccountProtocol:
             return {"payload": b64(payload), "signature": b64(signature)}
         if action == "status":
             member = self.store.membership(account, fingerprint)
-            return {"account": account, "membership": asdict(member) if member else None,
-                    "status": member.status(self.store._now()) if member else "unactivated"}
+            now = self.store._now()
+            result = {"account": account, "membership": asdict(member) if member else None,
+                      "status": member.status(now) if member else "unactivated"}
+            if self.activation_codes is not None:
+                result["server_time"] = now
+            return result
         if action == "redeem_free":
             result = self.store.redeem(account, fingerprint, body["code"])
             return {"membership": asdict(result)}
