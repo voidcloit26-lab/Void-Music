@@ -1,5 +1,6 @@
 package com.mochyy.mochymusic.guardian
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,6 +21,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var recognizedOwner by remember(client) { mutableStateOf(false) }
     var businessOpen by remember(client) { mutableStateOf(false) }
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
+    var linkRequired by remember(client) { mutableStateOf(false) }
     var recovery by remember(client) { mutableStateOf("") }
     var key by remember(client) { mutableStateOf("") }
     var error by remember(client) { mutableStateOf("") }
@@ -33,7 +35,16 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var approvedUpdate by remember(client) { mutableStateOf<GuardianQaCloud.UpdatePreview?>(null) }
 
     suspend fun refresh() {
-        result = client.request("status", emptyMap())
+        linkRequired = false
+        try {
+            result = client.request("status", emptyMap())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            result = null
+            linkRequired = e is GuardianAccountClient.RequestFailed && e.status == 403
+            throw e
+        }
         if (result?.optString("status") != "active") {
             lease.clear()
             leaseVerified = false
@@ -52,7 +63,10 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 throw e
             } catch (e: GuardianAccountClient.RequestFailed) {
                 if (e.status == 401 || e.status == 403) {
-                    if (e.status == 401) recognizedOwner = false
+                    if (e.status == 401) {
+                        recognizedOwner = false
+                        linkRequired = false
+                    }
                     if (e.status == 401 || result?.optString("status") != "expired") result = null
                     lease.clear()
                     leaseVerified = false
@@ -85,6 +99,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             recognizedOwner = false
             businessOpen = false
             result = null
+            linkRequired = false
             key = ""
             recovery = ""
             newRecovery = null
@@ -96,11 +111,18 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         }
     }
 
+    suspend fun refreshIdentity() {
+        recognizedOwner = false
+        linkRequired = false
+        recognizedOwner = client.request("identity_role", emptyMap()).optString("role") == "owner"
+        refresh()
+    }
+
+    BackHandler(enabled = newRecovery != null) { /* Save the one-time code before leaving. */ }
+
     LaunchedEffect(client) {
         run {
-            recognizedOwner = false
-            recognizedOwner = client.request("identity_role", emptyMap()).optString("role") == "owner"
-            refresh()
+            refreshIdentity()
             val current = result
             if (gateEntry && GuardianGate.v2Enforced && current?.optString("status") == "active") {
                 check(GuardianV2Runtime.authorize(context.applicationContext, client, current.getString("account")))
@@ -172,7 +194,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                         check(GuardianV2Runtime.authorize(context.applicationContext, client, account.getString("account")))
                         GuardianV2Runtime.openMusic(context)
                     }
-                }, enabled = !busy) { Text("Enter VOID Music") }
+                }, enabled = !busy && newRecovery == null) { Text("Enter VOID Music") }
             }
             if (status == "active") {
                 OutlinedButton(onClick = {
@@ -229,7 +251,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             }, enabled = !busy && approvedBackup == null) { Text("Preview restore") }
             Text("No automatic uploads, audio files or overwrites. Only confirm if all reviewed local metadata belongs to you.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
-        } else {
+        } else if (linkRequired) {
             if (recognizedOwner) Button(onClick = {
                 run {
                     val created = client.request("register_owner", emptyMap())
@@ -238,7 +260,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }
             }, enabled = !busy) { Text("Activate owner lifetime account") }
             Text("Complete your VOID account", style = MaterialTheme.typography.titleMedium)
-            Text("After verifying your email, enter the activation key supplied by VOID. Existing members should use account recovery instead.")
+            Text("This device could not verify a linked account. If you are new, enter the activation key supplied by VOID. Existing members should use account recovery.")
             OutlinedTextField(key, { key = it.trim().take(43) }, label = { Text("Activation key") },
                 singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !busy,
                 modifier = Modifier.fillMaxWidth())
@@ -260,8 +282,10 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 enabled = !busy && newRecovery == null && Regex("[A-Za-z0-9_-]{43}").matches(recovery)) {
                 Text("Recover existing account")
             }
+        } else {
+            Text(if (busy) "Checking your VOID account…" else "Account status unavailable. Refresh to continue safely.")
         }
-        OutlinedButton(onClick = { run { refresh() } }, enabled = !busy) { Text("Refresh membership") }
+        OutlinedButton(onClick = { run { refreshIdentity() } }, enabled = !busy && newRecovery == null) { Text("Refresh membership") }
         OutlinedButton(onClick = {
             signOutAccount()
         }, enabled = !busy && newRecovery == null) { Text("Sign out") }
