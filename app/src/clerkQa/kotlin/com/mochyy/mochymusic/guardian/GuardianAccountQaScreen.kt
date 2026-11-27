@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -363,9 +364,20 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             dismissButton = { TextButton(onClick = { approvedBackup = null }, enabled = !busy) { Text("Cancel") } })
     }
     newRecovery?.let { value ->
+        var copyFeedback by remember(value) { mutableStateOf("") }
         AlertDialog(onDismissRequest = {},
+            properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
             title = { Text("Save your recovery code") },
-            text = { Text("Keep this code in a secure password manager. It is shown once. Do not share it.\n\n$value") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Keep this code in a secure password manager. It is shown once. Do not share it.")
+                    Text(value)
+                    OutlinedButton(onClick = {
+                        copyFeedback = if (GuardianSecretClipboard.copy(context, value)) "Recovery code copied. Paste only into your secure password manager." else "Copy unavailable."
+                    }) { Text("Copy recovery code") }
+                    if (copyFeedback.isNotEmpty()) Text(copyFeedback)
+                }
+            },
             confirmButton = { TextButton(onClick = { newRecovery = null }) { Text("I saved it") } })
     }
 }
