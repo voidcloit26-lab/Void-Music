@@ -32,11 +32,10 @@ internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: 
             } else if (onSignOut != null) switchAccount = true
         }
     }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("VOID MUSIC", style = MaterialTheme.typography.labelLarge)
+    GuardianAccountLayout {
+        GuardianBrandHeader("VOID Music", "Membership")
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
+        if (error.isNotEmpty()) GuardianAccountNotice(error)
         when (page) {
             "expired" -> {
                 Text("Your membership has ended", style = MaterialTheme.typography.headlineMedium)
