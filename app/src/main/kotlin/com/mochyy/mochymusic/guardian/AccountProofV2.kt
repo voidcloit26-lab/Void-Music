@@ -11,7 +11,7 @@ internal object AccountProofV2 {
         "rotate_recovery" to emptySet(), "lease" to emptySet(),
         "status" to emptySet(), "redeem_free" to setOf("code"),
         "cloud_read" to emptySet(), "cloud_write" to setOf("revision", "library"),
-        "cloud_clear" to setOf("revision")
+        "cloud_clear" to setOf("revision"), "release_policy" to emptySet()
     )
     private fun quote(value: String): String = buildString {
         append('"')
