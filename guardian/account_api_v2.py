@@ -11,6 +11,7 @@ from guardian.account_protocol_v2 import MAX_BODY
 from guardian.clerk_session import SessionDenied
 from guardian.cloud_store import RevisionConflict
 from guardian.membership_rules import MembershipDenied
+from guardian.version_gate import UpdateRequired
 
 ROUTES = {
     "/v2/challenge": {"public_key","action","body"},
@@ -89,6 +90,8 @@ class AccountAPI:
             return reply("403 Forbidden",{"error":"access_denied"})
         except RevisionConflict:
             return reply("409 Conflict",{"error":"revision_conflict"})
+        except UpdateRequired:
+            return reply("426 Upgrade Required",{"error":"update_required"})
         except (ValueError,UnicodeError,RecursionError):
             return reply("400 Bad Request",{"error":"invalid_request"})
         except Exception:
