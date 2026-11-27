@@ -158,7 +158,12 @@ abstract class InternalDatabase : RoomDatabase() {
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
                     .addMigrations(*AllMigrations)
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .apply {
+                        // Protected libraries must never be erased on a missing migration.
+                        if (!com.mochyy.mochymusic.BuildConfig.VOID_GUARDIAN_V2_ENFORCED) {
+                            fallbackToDestructiveMigration(dropAllTables = true)
+                        }
+                    }
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
                     .setQueryExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
