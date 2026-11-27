@@ -36,6 +36,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var approvedRestore by remember(client) { mutableStateOf<GuardianQaCloud.RestorePreview?>(null) }
     var approvedUpdate by remember(client) { mutableStateOf<GuardianQaCloud.UpdatePreview?>(null) }
     var approvedPreferences by remember(client) { mutableStateOf<GuardianQaCloud.PreferencePreview?>(null) }
+    var confirmAutoSync by remember(client) { mutableStateOf<String?>(null) }
+    val automaticSyncStatus by GuardianAutomaticSync.status.collectAsState()
 
     suspend fun refresh() {
         linkRequired = false
@@ -272,8 +274,28 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     approvedBackup == null && approvedUpdate == null && approvedRestore == null) { Text("Review saved playback settings") }
                 Text("Create a library backup first. Settings changes are separate from music metadata.", style = MaterialTheme.typography.bodySmall)
             }
+            if (status == "active" && libraryMatches && GuardianGate.v2Enforced) {
+                Text(when (automaticSyncStatus) {
+                    GuardianAutomaticSync.Status.DISABLED -> "Automatic backup: off"
+                    GuardianAutomaticSync.Status.ENABLED -> "Automatic backup: on for this session"
+                    GuardianAutomaticSync.Status.SYNCING -> "Automatic backup: checking additions"
+                    GuardianAutomaticSync.Status.REVIEW_REQUIRED -> "Automatic backup paused. Review your library manually."
+                })
+                if (automaticSyncStatus == GuardianAutomaticSync.Status.ENABLED ||
+                    automaticSyncStatus == GuardianAutomaticSync.Status.SYNCING) {
+                    OutlinedButton(onClick = { GuardianAutomaticSync.disable() }, enabled = !busy) {
+                        Text("Disable automatic backup")
+                    }
+                } else {
+                    OutlinedButton(onClick = { confirmAutoSync = accountId },
+                        enabled = !busy && newRecovery == null && approvedBackup == null &&
+                            approvedUpdate == null && approvedRestore == null && approvedPreferences == null) {
+                        Text("Enable automatic backup")
+                    }
+                }
+            }
             if (!libraryMatches) Text("Local backup and restore require a verified library owner.")
-            Text("No automatic uploads, audio files or overwrites. Only confirm if all reviewed local metadata belongs to you.")
+            Text("No audio files or automatic deletions. Automatic backup requires your explicit consent and a matching reviewed library.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else if (linkRequired) {
             if (recognizedOwner) Button(onClick = {
@@ -386,6 +408,24 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }, enabled = !busy) { Text("I own this library — back up") }
             },
             dismissButton = { TextButton(onClick = { approvedBackup = null }, enabled = !busy) { Text("Cancel") } })
+    }
+    confirmAutoSync?.let { accountId ->
+        AlertDialog(
+            onDismissRequest = { confirmAutoSync = null },
+            title = { Text("Enable automatic backup?") },
+            text = { Text("Your saved favorites and independent playlist additions may be uploaded during successful membership refreshes while this session is active. First make sure the reviewed cloud backup matches your local library. Removals, conflicts and settings changes require manual review. Sign-out or restarting the app disables this feature. An upload already sent cannot be recalled.") },
+            confirmButton = { TextButton(onClick = {
+                confirmAutoSync = null
+                run {
+                    if (GuardianV2Runtime.enableAutomaticSync(context, accountId)) {
+                        cloudSummary = "Automatic backup enabled for this session."
+                    } else {
+                        error = "Open your authorized music session first, then return to VOID Account."
+                    }
+                }
+            }, enabled = !busy) { Text("Enable") } },
+            dismissButton = { TextButton(onClick = { confirmAutoSync = null }) { Text("Cancel") } }
+        )
     }
     approvedPreferences?.let { approved ->
         AlertDialog(
