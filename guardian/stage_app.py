@@ -1,6 +1,7 @@
 """Explicit staging-only WSGI factory. No owner routes or payment processing."""
 import os
 import base64
+import json
 from guardian.stage_store import StageStore
 from guardian.clerk_session import ClerkSessionVerifier
 from guardian.account_api_v2 import AccountAPI
@@ -11,6 +12,8 @@ from guardian.stage_signing import load_signing_pair
 from guardian.stage_account_guard import AccountFairness, authorize_request
 from guardian.activation_codes_v2 import ActivationCodes
 from guardian.clerk_profile import ClerkProfileLookup
+from guardian.owner_identity_policy import OwnerIdentityPolicy
+from guardian.owner_bootstrap import OwnerBootstrap
 
 
 def create_app():
@@ -39,8 +42,14 @@ def create_app():
                         raise PermissionError('unsafe activation grants')
             activation_codes = ActivationCodes(store)
             profile_lookup = ClerkProfileLookup(os.environ['VOID_V2_CLERK_SECRET_KEY'])
+        owner_bootstrap = None
+        if os.environ.get('VOID_V2_OWNER_IDENTITY_ENABLED') == 'true':
+            if profile_lookup is None:
+                raise ValueError('verified activation must be enabled')
+            policy = OwnerIdentityPolicy(issuer,json.loads(os.environ['VOID_V2_OWNER_IDENTITIES_JSON']))
+            owner_bootstrap = OwnerBootstrap(store,policy,profile_lookup)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
-                                   activation_codes=activation_codes, profile_lookup=profile_lookup)
+                                   activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap)
         fairness = AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
     except Exception:
