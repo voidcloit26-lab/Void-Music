@@ -89,25 +89,31 @@ internal object GuardianCloudRestore {
      * Room write transaction to reject concurrent changes before writing.
      */
     suspend fun apply(database: MusicDatabase, cloud: CloudRestorePlan.Library,
-                      approved: CloudRestorePlan.Plan, confirmed: Boolean) {
-        require(confirmed && approved.ready)
+                      approved: CloudRestorePlan.Plan, confirmed: Boolean, stillCurrent: () -> Boolean = { true }) {
+        require(confirmed && approved.ready && stillCurrent())
         database.withTransaction {
             val db = openHelper.writableDatabase
+            check(stillCurrent()) { "Account changed" }
             val current = plan(db, cloud)
             check(current == approved && current.ready) { "Library changed; preview again" }
+            check(stillCurrent()) { "Account changed" }
             val now = LocalDateTime.now()
             // Existing eligible songs only, and never remove current favorites.
             for (id in current.addFavorites) {
+                check(stillCurrent()) { "Account changed" }
                 // Room's time converter uses UTC epoch milliseconds.
                 val epoch = now.toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
                 db.execSQL("UPDATE song SET liked=1,likedDate=? WHERE id=? AND liked=0", arrayOf<Any?>(epoch,id))
             }
             for (playlist in current.addPlaylists) {
+                check(stillCurrent()) { "Account changed" }
                 insert(PlaylistEntity(id=playlist.id, name=playlist.name, bookmarkedAt=now, isLocal=true))
                 for ((position, id) in playlist.tracks.withIndex()) {
+                    check(stillCurrent()) { "Account changed" }
                     insert(PlaylistSongMap(playlistId=playlist.id, songId=id, position=position))
                 }
             }
+            check(stillCurrent()) { "Account changed" }
         }
     }
 }

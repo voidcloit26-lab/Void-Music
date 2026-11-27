@@ -11,7 +11,7 @@ internal class GuardianQaCloud(
     private val isCurrent: () -> Boolean
 ) {
     data class FirstBackup(val account: String, val preview: GuardianCloudSnapshot.Preview)
-    data class RestorePreview(val revision: Long, val plan: CloudRestorePlan.Plan)
+    data class RestorePreview(val account: String, val revision: Long, val library: CloudRestorePlan.Library, val plan: CloudRestorePlan.Plan)
 
     private suspend fun requireAccount(account: String) {
         require(account.matches(Regex("[a-f0-9]{32}")))
@@ -52,9 +52,21 @@ internal class GuardianQaCloud(
             return null
         }
         require(revision > 0L)
-        val plan = GuardianCloudRestore.preview(database,
-            GuardianCloudRestore.parse(remote.getJSONObject("library")))
+        val library = GuardianCloudRestore.parse(remote.getJSONObject("library"))
+        val plan = GuardianCloudRestore.preview(database, library)
         check(isCurrent())
-        return RestorePreview(revision, plan)
+        return RestorePreview(account, revision, library, plan)
+    }
+
+    suspend fun confirmRestore(approved: RestorePreview, confirmed: Boolean) {
+        require(confirmed && approved.plan.ready)
+        requireAccount(approved.account)
+        val status = client.request("status", emptyMap())
+        check(status.getString("account") == approved.account && status.getString("status") == "active")
+        val remote = client.request("cloud_read", emptyMap())
+        check(remote.getLong("revision") == approved.revision && !remote.isNull("library"))
+        val library = GuardianCloudRestore.parse(remote.getJSONObject("library"))
+        check(library == approved.library && isCurrent()) { "Backup changed; preview again" }
+        GuardianCloudRestore.apply(database, library, approved.plan, confirmed = true, stillCurrent = isCurrent)
     }
 }

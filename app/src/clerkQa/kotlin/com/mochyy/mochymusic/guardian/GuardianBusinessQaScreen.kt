@@ -74,8 +74,8 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
                     val response=client.request("codes/create",data).getJSONArray("codes")
                     codes=List(response.length()){response.getString(it)}
                 }
-            },enabled=!busy && codes.isEmpty() && count.toIntOrNull() in 1..100 && ttl.toIntOrNull() in 0..30 &&
-                (kind !in listOf("trial","complimentary") || days.toIntOrNull() in 1..365)) { Text("Generate codes") }
+            },enabled=!busy && codes.isEmpty() && (count.toIntOrNull() ?: -1) in 1..100 && (ttl.toIntOrNull() ?: -1) in 0..30 &&
+                (kind !in listOf("trial","complimentary") || (days.toIntOrNull() ?: -1) in 1..365)) { Text("Generate codes") }
             OutlinedButton(onClick={run { list=client.request("codes/list").getJSONArray("codes") }},enabled=!busy) {Text("View activation history")}
             list?.let { rows ->
                 for(i in 0 until rows.length()) {
@@ -101,7 +101,7 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
             }
             Text("Reference price",style=MaterialTheme.typography.titleLarge)
             OutlinedTextField(price,{price=it.filter(Char::isDigit).take(7)},label={Text("USD cents")},singleLine=true)
-            OutlinedButton(onClick={confirmation="price:"+price},enabled=!busy && price.toIntOrNull() in 1..1000000){Text("Change reference price")}
+            OutlinedButton(onClick={confirmation="price:"+price},enabled=!busy && (price.toIntOrNull() ?: -1) in 1..1000000){Text("Change reference price")}
             Text("No in-app payments are enabled.")
         }
     }

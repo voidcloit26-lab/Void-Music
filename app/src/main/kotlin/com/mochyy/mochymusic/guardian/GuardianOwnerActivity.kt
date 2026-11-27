@@ -32,6 +32,7 @@ import org.json.JSONObject
 class GuardianOwnerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (GuardianGate.v2Enforced) { finish(); return }
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         if (Build.VERSION.SDK_INT >= 26) window.decorView.importantForAutofill =
             android.view.View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS

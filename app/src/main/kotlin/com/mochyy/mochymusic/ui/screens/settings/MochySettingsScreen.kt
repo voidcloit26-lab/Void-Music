@@ -531,9 +531,9 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                         )
 
                         if (com.mochyy.mochymusic.BuildConfig.VOID_CLERK_QA_ENABLED &&
-                            !com.mochyy.mochymusic.guardian.GuardianGate.enforced) {
+                            (!com.mochyy.mochymusic.guardian.GuardianGate.enforced || com.mochyy.mochymusic.guardian.GuardianGate.v2Enforced)) {
                             CategoryBubble(
-                                title = "VOID account · staging QA",
+                                title = if (com.mochyy.mochymusic.guardian.GuardianGate.v2Enforced) "VOID Account" else "VOID account · staging QA",
                                 iconRes = R.drawable.security,
                                 onClick = {
                                     context.startActivity(android.content.Intent(
@@ -542,7 +542,7 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                             )
                         }
 
-                        if (com.mochyy.mochymusic.guardian.GuardianGate.enforced) {
+                        if (com.mochyy.mochymusic.guardian.GuardianGate.enforced && !com.mochyy.mochymusic.guardian.GuardianGate.v2Enforced) {
                             CategoryBubble(
                                 title = "Guardian owner access",
                                 iconRes = R.drawable.security,

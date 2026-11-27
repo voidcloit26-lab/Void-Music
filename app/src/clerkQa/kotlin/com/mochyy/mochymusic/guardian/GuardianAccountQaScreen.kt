@@ -29,6 +29,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var leaseVerified by remember(client) { mutableStateOf(false) }
     var cloudSummary by remember(client) { mutableStateOf<String?>(null) }
     var approvedBackup by remember(client) { mutableStateOf<GuardianQaCloud.FirstBackup?>(null) }
+    var approvedRestore by remember(client) { mutableStateOf<GuardianQaCloud.RestorePreview?>(null) }
 
     suspend fun refresh() {
         result = client.request("status", emptyMap())
@@ -49,11 +50,13 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 throw e
             } catch (e: GuardianAccountClient.RequestFailed) {
                 if (e.status == 401 || e.status == 403) {
-                    result = null
+                    if (e.status == 401 || result?.optString("status") != "expired") result = null
                     lease.clear()
                     leaseVerified = false
                     cloudSummary = null
                     approvedBackup = null
+                    approvedRestore = null
+                    if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
                 }
                 error = when (e.status) {
                     401 -> "Sign in again to continue."
@@ -170,6 +173,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             OutlinedButton(onClick = {
                 run {
                     val preview = cloud.previewRestore(account.getString("account"))
+                    approvedRestore = preview?.takeIf { status == "active" && it.plan.ready }
                     cloudSummary = if (preview == null) "No cloud backup yet" else
                         "Restore preview: ${preview.plan.addFavorites.size} favorites, " +
                         "${preview.plan.addPlaylists.size} playlists, " +
@@ -225,6 +229,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 leaseVerified = false
                 cloudSummary = null
                 approvedBackup = null
+                approvedRestore = null
             }
         }, enabled = !busy && newRecovery == null) { Text("Sign out") }
     }
@@ -246,6 +251,19 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         },
         dismissButton = { TextButton(onClick = { confirmRecovery = false }) { Text("Cancel") } }
     )
+    approvedRestore?.let { approved ->
+        AlertDialog(onDismissRequest = { if (!busy) approvedRestore = null },
+            title = { Text("Restore saved library?") },
+            text = { Text("Add ${approved.plan.addFavorites.size} favorites and ${approved.plan.addPlaylists.size} playlists from this account. Existing items will not be removed or overwritten. Continue only if this local library belongs to you.") },
+            confirmButton = { TextButton(onClick = {
+                approvedRestore = null
+                run {
+                    cloud.confirmRestore(approved, confirmed = true)
+                    cloudSummary = "Saved library restored without overwriting existing items."
+                }
+            }, enabled = !busy) { Text("Restore my library") } },
+            dismissButton = { TextButton(onClick = { approvedRestore = null }, enabled = !busy) { Text("Cancel") } })
+    }
     approvedBackup?.let { approved ->
         val favorites = approved.preview.body["favorites"] as? List<*> ?: emptyList<Any>()
         val playlists = approved.preview.body["playlists"] as? List<*> ?: emptyList<Any>()
