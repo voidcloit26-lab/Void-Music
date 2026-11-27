@@ -29,6 +29,7 @@ class OwnerBootstrapTests(unittest.TestCase):
     def test_unverified_owner_denied(self):
         self.profile["email_addresses"][0]["verification"]["status"]="unverified"
         with self.assertRaises(MembershipDenied): self.bootstrap.register(self.session,"a"*64)
+        with self.assertRaises(MembershipDenied): self.bootstrap.role(self.session)
     def test_duplicate_bootstrap(self):
         self.bootstrap.register(self.session,"a"*64)
         with self.assertRaises(MembershipDenied): self.bootstrap.register(self.session,"b"*64)
