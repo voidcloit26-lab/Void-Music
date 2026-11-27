@@ -37,6 +37,7 @@ object GuardianGate {
         val app = context.applicationContext
         while (true) {
             if (!withContext(Dispatchers.IO) { isAllowed(app) }) {
+                changed()
                 onLocked()
                 return
             }
@@ -51,6 +52,7 @@ object GuardianGate {
                 }
             }
             if (!withContext(Dispatchers.IO) { isAllowed(app) }) {
+                changed()
                 onLocked()
                 return
             }

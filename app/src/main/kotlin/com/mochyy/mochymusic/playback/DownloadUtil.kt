@@ -49,6 +49,7 @@ import com.mochyy.mochymusic.ui.utils.resize
 import com.mochyy.mochymusic.utils.YTPlayerUtils
 import com.mochyy.mochymusic.utils.enumPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -321,6 +322,21 @@ constructor(
         scope.launch { followBatches() }
         scope.launch { followAutoDownloads(context) }
 
+        // V2 may expire while no player or activity is alive. Keep downloads
+        // paused on denial without deleting existing cached files.
+        if (com.mochyy.mochymusic.guardian.GuardianGate.v2Enforced) scope.launch {
+            var previous: Boolean? = null
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                val allowed = com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context)
+                if (allowed != previous) {
+                    previous = allowed
+                    com.mochyy.mochymusic.guardian.GuardianGate.changed()
+                }
+                if (!allowed) kotlinx.coroutines.withContext(Dispatchers.Main) { downloadManager.pauseDownloads() }
+                kotlinx.coroutines.delay(5000L)
+            }
+        }
+
         // Offline mode holds downloads where they are rather than failing them: they carry on
         // when it's turned off. Only then - resuming whenever offline mode reads off, at every
         // start included, would undo downloads paused for any other reason.
@@ -486,7 +502,7 @@ constructor(
     }
 
     private suspend fun startAutoDownload(context: Context, songId: String) {
-        if (OfflineMode.isOn) return
+        if (OfflineMode.isOn || !com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context)) return
         // already saved, on its way, or stopped by hand: asking again would start a finished one over
         val known = downloads.value[songId]
         if (known != null && known.state != Download.STATE_FAILED) return
@@ -498,6 +514,7 @@ constructor(
             .setData(song.song.title.toByteArray())
             .build()
         kotlinx.coroutines.withContext(Dispatchers.Main) {
+            if (!com.mochyy.mochymusic.guardian.GuardianGate.isAllowed(context)) return@withContext
             // android won't start the service from the background (a sync running behind another app), so the manager takes it straight then
             runCatching {
                 androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(context, ExoDownloadService::class.java, request, false)
