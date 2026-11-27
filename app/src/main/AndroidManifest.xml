@@ -1147,6 +1147,7 @@
         <!-- mochy's own android auto screens: tabs, lists, the player and lyrics, all from google's car templates -->
         <service
             android:name=".car.MochyCarAppService"
+            android:enabled="${voidCarServiceEnabled}"
             android:exported="true"
             tools:ignore="ExportedService">
             <intent-filter>
