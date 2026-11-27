@@ -9,6 +9,8 @@ from guardian.durable_challenges import DurableChallenges
 from guardian.shared_budget import SharedBudget
 from guardian.stage_signing import load_signing_pair
 from guardian.stage_account_guard import AccountFairness, authorize_request
+from guardian.activation_codes_v2 import ActivationCodes
+from guardian.clerk_profile import ClerkProfileLookup
 
 
 def create_app():
@@ -22,7 +24,23 @@ def create_app():
                                 os.environ['VOID_V2_LEASE_PUBLIC_KEY'])
         store = StageStore(os.environ['VOID_V2_STAGE_DATABASE_URL'],
             bytes.fromhex(os.environ['VOID_V2_STAGE_PEPPER']), issuer=issuer)
-        protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store))
+        activation_codes = profile_lookup = None
+        if os.environ.get('VOID_V2_ACTIVATION_ENABLED') == 'true':
+            with store.transaction() as db:
+                db.execute('SELECT digest,kind,days,expires_at,bound_identity,redeemed_account,redeemed_at,cancelled_at FROM activation_codes_v2 LIMIT 0')
+                for column in ('redeemed_account','redeemed_at'):
+                    if not db.execute("SELECT has_column_privilege(current_user,'guardian_v2_stage.activation_codes_v2',?,'UPDATE')",(column,)).fetchone()[0]:
+                        raise PermissionError('activation grants missing')
+                for column in ('kind','bound_identity','cancelled_at','expires_at'):
+                    if db.execute("SELECT has_column_privilege(current_user,'guardian_v2_stage.activation_codes_v2',?,'UPDATE')",(column,)).fetchone()[0]:
+                        raise PermissionError('unsafe activation grants')
+                for privilege in ('INSERT','DELETE'):
+                    if db.execute("SELECT has_table_privilege(current_user,'guardian_v2_stage.activation_codes_v2',?)",(privilege,)).fetchone()[0]:
+                        raise PermissionError('unsafe activation grants')
+            activation_codes = ActivationCodes(store)
+            profile_lookup = ClerkProfileLookup(os.environ['VOID_V2_CLERK_SECRET_KEY'])
+        protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
+                                   activation_codes=activation_codes, profile_lookup=profile_lookup)
         fairness = AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
     except Exception:

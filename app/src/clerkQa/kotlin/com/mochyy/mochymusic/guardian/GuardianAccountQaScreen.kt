@@ -160,13 +160,22 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             Text("No automatic uploads, audio files or overwrites. Only confirm if all reviewed local metadata belongs to you.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else {
+            Text("Complete your VOID account", style = MaterialTheme.typography.titleMedium)
+            Text("After verifying your email, enter the activation key supplied by VOID. Existing members should use account recovery instead.")
+            OutlinedTextField(key, { key = it.trim().take(43) }, label = { Text("Activation key") },
+                singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !busy,
+                modifier = Modifier.fillMaxWidth())
             Button(onClick = {
+                val entered = key
+                key = ""
                 run {
-                    val created = client.request("register", emptyMap())
+                    val created = client.request("register_with_code", mapOf("code" to entered))
                     newRecovery = created.getString("recovery")
                     refresh()
                 }
-            }, enabled = !busy && newRecovery == null) { Text("Create new VOID account") }
+            }, enabled = !busy && newRecovery == null && Regex("[A-Za-z0-9_-]{43}").matches(key)) {
+                Text("Activate my account")
+            }
             OutlinedTextField(recovery, { recovery = it.take(43) }, label = { Text("Existing recovery code") },
                 singleLine = true, enabled = !busy, visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth())
