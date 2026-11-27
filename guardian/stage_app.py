@@ -49,7 +49,8 @@ def create_app():
             policy = OwnerIdentityPolicy(issuer,json.loads(os.environ['VOID_V2_OWNER_IDENTITIES_JSON']))
             owner_bootstrap = OwnerBootstrap(store,policy,profile_lookup)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
-                                   activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap)
+                                   activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap,
+                                   require_activation=True)
         fairness = AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
     except Exception:
