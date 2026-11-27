@@ -52,11 +52,11 @@ internal object GuardianV2Runtime {
     suspend fun authorize(context:Context,client:GuardianAccountClient,account:String):Boolean =
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                val initial=ClerkQaBridge.currentSession()
-                val b=Binding(initial.subject,initial.sessionId,account)
-                val startGeneration=synchronized(stateLock){generation}
-                require(Regex("[a-f0-9]{32}").matches(account))
                 try {
+                    val initial=ClerkQaBridge.currentSession()
+                    val b=Binding(initial.subject,initial.sessionId,account)
+                    val startGeneration=synchronized(stateLock){generation}
+                    require(Regex("[a-f0-9]{32}").matches(account))
                     val status=client.request("status",emptyMap())
                     if(status.getString("account")!=account || status.getString("status")!="active"){
                         clear(context);return@withContext false

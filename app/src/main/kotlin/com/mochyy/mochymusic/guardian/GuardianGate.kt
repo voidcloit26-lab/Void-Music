@@ -64,7 +64,7 @@ object GuardianGate {
         if (v2Enforced) GuardianV2Runtime.allowed(context.applicationContext)
         else !enforced || DeviceEntitlement.isActive(context.applicationContext, BuildConfig.VOID_GUARDIAN_PUBLIC_KEY)
 
-    internal fun client(context: Context): GuardianClient? = runCatching {
+    internal fun client(context: Context): GuardianClient? = if (v2Enforced) null else runCatching {
         GuardianClient(context, BuildConfig.VOID_GUARDIAN_ORIGIN, BuildConfig.VOID_GUARDIAN_PUBLIC_KEY)
     }.getOrNull()
 

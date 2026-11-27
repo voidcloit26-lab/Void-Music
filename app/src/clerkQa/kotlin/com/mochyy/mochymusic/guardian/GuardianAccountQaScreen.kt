@@ -50,6 +50,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 throw e
             } catch (e: GuardianAccountClient.RequestFailed) {
                 if (e.status == 401 || e.status == 403) {
+                    if (e.status == 401) recognizedOwner = false
                     if (e.status == 401 || result?.optString("status") != "expired") result = null
                     lease.clear()
                     leaseVerified = false
@@ -75,6 +76,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
 
     LaunchedEffect(client) {
         run {
+            recognizedOwner = false
             recognizedOwner = client.request("identity_role", emptyMap()).optString("role") == "owner"
             refresh()
         }
