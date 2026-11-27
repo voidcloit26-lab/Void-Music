@@ -10,6 +10,7 @@ import org.json.JSONArray
 internal class GuardianQaCloud(
     private val database: MusicDatabase,
     private val client: GuardianAccountClient,
+    private val ownsLibrary: (String) -> Boolean,
     private val isCurrent: () -> Boolean
 ) {
     data class FirstBackup(val account: String, val preview: GuardianCloudSnapshot.Preview)
@@ -18,9 +19,9 @@ internal class GuardianQaCloud(
 
     private suspend fun requireAccount(account: String, active: Boolean = false) {
         require(account.matches(Regex("[a-f0-9]{32}")))
-        check(isCurrent())
+        check(isCurrent() && ownsLibrary(account)) { "Local library owner mismatch" }
         val status = client.request("status", emptyMap())
-        check(isCurrent() && status.getString("account") == account)
+        check(isCurrent() && ownsLibrary(account) && status.getString("account") == account)
         if (active) check(status.getString("status") == "active") { "Active membership required" }
     }
 
