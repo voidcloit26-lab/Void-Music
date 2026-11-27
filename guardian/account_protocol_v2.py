@@ -23,6 +23,7 @@ from guardian.membership_rules import MembershipDenied
 from guardian.external_identity_store import ExternalIdentityStore
 from guardian.cloud_store import CloudStore
 from guardian.durable_challenges import DurableChallenges, ChallengeDenied
+from guardian.clerk_profile import verified_primary_email
 
 
 class LinkedCloudStore(ExternalIdentityStore, CloudStore):
@@ -31,6 +32,10 @@ class LinkedCloudStore(ExternalIdentityStore, CloudStore):
 
 ACTIONS = {
     "register": set(),
+    "register_with_code": {"code"},
+    "identity_role": set(),
+    "register_owner": set(),
+    "redeem_activation": {"code"},
     "recover": {"recovery"},
     "rotate_recovery": set(),
     "lease": set(),
@@ -65,10 +70,13 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
+        self.activation_codes = activation_codes
+        self.profile_lookup = profile_lookup
+        self.owner_bootstrap = owner_bootstrap
         self.max_pending = max_pending
         self.pending = {}
         self.lock = threading.Lock()
@@ -78,7 +86,9 @@ class AccountProtocol:
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
         # Except for registration and recovery, only the current linked device may allocate challenges.
-        if action not in ("register", "recover"):
+        if action in ("register_with_code", "redeem_activation") and self.activation_codes is None:
+            raise MembershipDenied("activation upgrade disabled")
+        if action not in ("register", "recover", "register_with_code", "identity_role", "register_owner"):
             self.store.resolve(session.issuer, session.subject, fingerprint)
         if self.challenges is not None:
             scope = DurableChallenges.scope(session.issuer, session.subject)
@@ -125,7 +135,29 @@ class AccountProtocol:
                 if self.pending.get(nonce) != pending or pending[1] <= self.clock():
                     raise AccessDenied("invalid challenge")
                 del self.pending[nonce]
+        if action == "identity_role":
+            return {"role":self.owner_bootstrap.role(session) if self.owner_bootstrap is not None else "member"}
+        if action == "register_owner":
+            if self.owner_bootstrap is None:
+                raise MembershipDenied("owner bootstrap disabled")
+            account,recovery,member=self.owner_bootstrap.register(session,fingerprint)
+            return {"account":account,"recovery":recovery,"membership":asdict(member),"status":"active","role":"owner"}
+        if action == "register_with_code":
+            if self.activation_codes is None:
+                raise MembershipDenied("activation upgrade disabled")
+            if self.profile_lookup is None:
+                raise MembershipDenied("verified onboarding unavailable")
+            verified_primary_email(session.subject, self.profile_lookup(session.subject))
+            account, recovery, member = self.activation_codes.register(session.issuer, session.subject, fingerprint, body["code"])
+            return {"account":account,"recovery":recovery,"membership":asdict(member),"status":member.status(self.store._now())}
+        if action == "redeem_activation":
+            if self.activation_codes is None:
+                raise MembershipDenied("activation upgrade disabled")
+            member = self.activation_codes.redeem(session.issuer,session.subject,fingerprint,body["code"])
+            return {"membership":asdict(member)}
         if action == "register":
+            if self.activation_codes is not None:
+                raise MembershipDenied("activation code required")
             account, recovery = self.store.register(session.issuer, session.subject, fingerprint)
             return {"account": account, "recovery": recovery, "status": "unactivated"}
         if action == "recover":
@@ -146,8 +178,12 @@ class AccountProtocol:
             return {"payload": b64(payload), "signature": b64(signature)}
         if action == "status":
             member = self.store.membership(account, fingerprint)
-            return {"account": account, "membership": asdict(member) if member else None,
-                    "status": member.status(self.store._now()) if member else "unactivated"}
+            now = self.store._now()
+            result = {"account": account, "membership": asdict(member) if member else None,
+                      "status": member.status(now) if member else "unactivated"}
+            if self.activation_codes is not None:
+                result["server_time"] = now
+            return result
         if action == "redeem_free":
             result = self.store.redeem(account, fingerprint, body["code"])
             return {"membership": asdict(result)}
