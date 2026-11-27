@@ -105,6 +105,13 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".guardian.ClerkQaActivity"
+            android:enabled="${voidClerkQaEnabled}"
+            android:exported="false"
+            android:theme="@style/Theme.mochy"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".guardian.GuardianOwnerActivity"
             android:exported="false"
             android:theme="@style/Theme.mochy"

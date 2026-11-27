@@ -177,6 +177,8 @@ extensions.configure<ApplicationExtension> {
             "Unexpected Clerk development publishable key"
         }
         buildConfigField("String", "VOID_CLERK_QA_PUBLISHABLE_KEY", "\"$clerkQaKey\"")
+        buildConfigField("Boolean", "VOID_CLERK_QA_ENABLED", clerkQaEnabled.toString())
+        manifestPlaceholders["voidClerkQaEnabled"] = clerkQaEnabled.toString()
         buildConfigField("Boolean", "VOID_GUARDIAN_ENFORCED", guardianEnforced.toString())
         buildConfigField("String", "VOID_GUARDIAN_ORIGIN", "\"$guardianOrigin\"")
         buildConfigField("String", "VOID_GUARDIAN_PUBLIC_KEY", "\"$guardianPublicKey\"")
@@ -257,7 +259,7 @@ extensions.configure<ApplicationExtension> {
     }
 
     sourceSets {
-        if (clerkQaEnabled) getByName("main").kotlin.directories.add("src/clerkQa/kotlin")
+        getByName("main").kotlin.directories.add(if (clerkQaEnabled) "src/clerkQa/kotlin" else "src/clerkOff/kotlin")
         getByName("fdroid") {
             java.directories.add("src/foss/kotlin")
             res.directories.add("src/foss/res")
