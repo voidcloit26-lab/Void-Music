@@ -22,6 +22,33 @@ internal class GuardianQaCloud(
     private val isCurrent: () -> Boolean
 ) : GuardianAutomaticSync.Port {
     private val settings = context.applicationContext.dataStore
+    data class UpgradeBackup(val account: String, val revision: Long, val snapshot: GuardianCloudSnapshot.Preview)
+    data class UpgradeReceipt(val revision: Long, val recovery: String)
+
+    suspend fun previewUpgradeBackup(account: String): UpgradeBackup {
+        requireAccount(account, active = true)
+        val remote = client.request("cloud_read", emptyMap())
+        val revision = remote.getLong("revision")
+        require(revision >= 0L && (remote.isNull("library") == (revision == 0L)))
+        val preferences = if (revision == 0L) emptyMap() else prefsOf(remoteBody(remote))
+        val snapshot = GuardianCloudSnapshot.capture(database, preferences)
+        check(isCurrent() && ownsLibrary(account))
+        return UpgradeBackup(account, revision, snapshot)
+    }
+
+    suspend fun confirmUpgradeBackup(approved: UpgradeBackup): UpgradeReceipt {
+        requireAccount(approved.account, active = true)
+        check(previewUpgradeBackup(approved.account) == approved) { "Library changed; review again" }
+        check(isCurrent() && ownsLibrary(approved.account))
+        val reply = client.request("backup_for_upgrade", mapOf("revision" to approved.revision, "library" to approved.snapshot.body))
+        check(isCurrent() && ownsLibrary(approved.account))
+        val revision = reply.getLong("revision")
+        val recovery = reply.getString("recovery")
+        require(revision > 0L && revision in approved.revision..(approved.revision + 1))
+        require(Regex("[A-Za-z0-9_-]{43}").matches(recovery))
+        return UpgradeReceipt(revision, recovery)
+    }
+
     data class FirstBackup(val account: String, val preview: GuardianCloudSnapshot.Preview)
     data class UpdatePreview(val account: String, val revision: Long, val remoteDigest: String, val local: GuardianCloudSnapshot.Preview)
     data class RestorePreview(val account: String, val revision: Long, val library: CloudRestorePlan.Library, val plan: CloudRestorePlan.Plan)
