@@ -23,6 +23,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var businessOpen by remember(client) { mutableStateOf(false) }
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
     var linkRequired by remember(client) { mutableStateOf(false) }
+    var confirmLibraryAccount by remember(client) { mutableStateOf<String?>(null) }
     var recovery by remember(client) { mutableStateOf("") }
     var key by remember(client) { mutableStateOf("") }
     var error by remember(client) { mutableStateOf("") }
@@ -125,7 +126,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         run {
             refreshIdentity()
             val current = result
-            if (gateEntry && GuardianGate.v2Enforced && current?.optString("status") == "active") {
+            if (gateEntry && GuardianGate.v2Enforced && current?.optString("status") == "active" &&
+                GuardianLocalLibraryOwner.status(context, current.getString("account")) == LocalLibraryBinding.Status.MATCH) {
                 check(GuardianV2Runtime.authorize(context.applicationContext, client, current.getString("account")))
                 GuardianV2Runtime.openMusic(context)
             }
@@ -158,6 +160,9 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             Text("VOID account", style = MaterialTheme.typography.titleMedium)
             Text(account.optString("account"))
             val status = account.optString("status", "unknown")
+            val accountId = account.getString("account")
+            val libraryOwner = GuardianLocalLibraryOwner.status(context, accountId)
+            val libraryMatches = libraryOwner == LocalLibraryBinding.Status.MATCH
             Text("Membership: " + status)
             if (recognizedOwner && status == "active") Button(onClick = { businessOpen = true }, enabled = !busy) { Text("Guardian Business") }
             account.optJSONObject("membership")?.let {
@@ -190,12 +195,19 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 run { newRecovery = client.request("rotate_recovery", emptyMap()).getString("recovery") }
             }, enabled = !busy && newRecovery == null) { Text("Replace recovery code") }
             if (status == "active" && GuardianGate.v2Enforced) {
-                Button(onClick = {
-                    run {
-                        check(GuardianV2Runtime.authorize(context.applicationContext, client, account.getString("account")))
-                        GuardianV2Runtime.openMusic(context)
-                    }
-                }, enabled = !busy && newRecovery == null) { Text("Enter VOID Music") }
+                when (libraryOwner) {
+                    LocalLibraryBinding.Status.MATCH -> Button(onClick = {
+                        run {
+                            check(GuardianV2Runtime.authorize(context.applicationContext, client, accountId))
+                            GuardianV2Runtime.openMusic(context)
+                        }
+                    }, enabled = !busy && newRecovery == null) { Text("Enter VOID Music") }
+                    LocalLibraryBinding.Status.UNCLAIMED -> Button(onClick = {
+                        confirmLibraryAccount = accountId
+                    }, enabled = !busy && newRecovery == null) { Text("Connect my local library") }
+                    LocalLibraryBinding.Status.OTHER -> Text("This installation has a different library owner. Sign in to that account. Existing music data has not been changed.", color = MaterialTheme.colorScheme.error)
+                    LocalLibraryBinding.Status.UNAVAILABLE -> Text("Local library ownership could not be verified. Access remains locked.", color = MaterialTheme.colorScheme.error)
+                }
             }
             if (status == "active") {
                 OutlinedButton(onClick = {
@@ -230,12 +242,12 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             if (status == "active") {
                 OutlinedButton(onClick = {
                     run { approvedBackup = cloud.previewFirst(account.getString("account")) }
-                }, enabled = !busy && approvedBackup == null) { Text("Review first cloud backup") }
+                }, enabled = !busy && libraryMatches && approvedBackup == null) { Text("Review first cloud backup") }
             }
             if (status == "active") {
                 OutlinedButton(onClick = {
                     run { approvedUpdate = cloud.previewUpdate(account.getString("account")) }
-                }, enabled = !busy && approvedBackup == null && approvedUpdate == null) {
+                }, enabled = !busy && libraryMatches && approvedBackup == null && approvedUpdate == null) {
                     Text("Review backup update")
                 }
             }
@@ -249,7 +261,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                         "${preview.plan.missingTracks.size} missing tracks, " +
                         "${preview.plan.conflictingPlaylists.size} conflicts. No changes made."
                 }
-            }, enabled = !busy && approvedBackup == null) { Text("Preview restore") }
+            }, enabled = !busy && libraryMatches && approvedBackup == null) { Text("Preview restore") }
+            if (!libraryMatches) Text("Local backup and restore require a verified library owner.")
             Text("No automatic uploads, audio files or overwrites. Only confirm if all reviewed local metadata belongs to you.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else if (linkRequired) {
@@ -362,6 +375,21 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }, enabled = !busy) { Text("I own this library — back up") }
             },
             dismissButton = { TextButton(onClick = { approvedBackup = null }, enabled = !busy) { Text("Cancel") } })
+    }
+    confirmLibraryAccount?.let { accountId ->
+        AlertDialog(
+            onDismissRequest = { confirmLibraryAccount = null },
+            title = { Text("Connect this library?") },
+            text = { Text("Only continue if the local music library and downloads belong to your account. This installation can use one account until separate account storage is supported. Existing files are not deleted.") },
+            confirmButton = { TextButton(onClick = {
+                confirmLibraryAccount = null
+                run {
+                    check(GuardianV2Runtime.authorize(context.applicationContext, client, accountId, confirmLocalLibrary = true))
+                    GuardianV2Runtime.openMusic(context)
+                }
+            }, enabled = !busy) { Text("Confirm ownership") } },
+            dismissButton = { TextButton(onClick = { confirmLibraryAccount = null }) { Text("Cancel") } }
+        )
     }
     newRecovery?.let { value ->
         var copyFeedback by remember(value) { mutableStateOf("") }
