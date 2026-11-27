@@ -120,6 +120,7 @@ internal fun DiscordProfileCard(
     track: NowPlaying,
     settings: PresenceSettings,
     modifier: Modifier = Modifier,
+    nativePreview: Boolean = false,
 ) {
     Column(
         modifier =
@@ -145,7 +146,7 @@ internal fun DiscordProfileCard(
         }
         Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 10.dp)) {
             Text(
-                text = profile?.displayName ?: stringResource(R.string.discord_not_connected),
+                text = profile?.displayName ?: if (nativePreview) "Activity preview" else stringResource(R.string.discord_not_connected),
                 color = DiscordColors.Primary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -155,7 +156,7 @@ internal fun DiscordProfileCard(
             Text(
                 text =
                     profile?.let { listOfNotNull(it.username, it.pronouns).joinToString(" · ") }
-                        ?: stringResource(R.string.discord_login_to_show_profile),
+                        ?: if (nativePreview) "Local preview · not a Discord profile" else stringResource(R.string.discord_login_to_show_profile),
                 color = DiscordColors.Secondary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,

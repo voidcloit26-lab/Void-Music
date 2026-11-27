@@ -14,6 +14,8 @@ internal object NativePresenceBridge {
     val included get() = BuildConfig.VOID_NATIVE_RPC_INCLUDED
     private val _ready = MutableStateFlow(false)
     val ready = _ready.asStateFlow()
+    private val _attachmentEpoch = MutableStateFlow(0L)
+    val attachmentEpoch = _attachmentEpoch.asStateFlow()
 
     fun attach(activity: Activity) {
         if (!included) return
@@ -26,6 +28,7 @@ internal object NativePresenceBridge {
             initNative()
             true
         }.getOrDefault(false)
+        if (_ready.value) _attachmentEpoch.value += 1L
     }
 
     fun publish(payload: NativePresencePayload) {

@@ -1,0 +1,36 @@
+package com.mochyy.mochymusic.discord
+
+fun main() {
+    val p = PresenceRetry()
+    var n = 0
+    fun verify(ok: Boolean) { check(ok); n++ }
+    verify(p.due(0, false))
+    p.begin(0, 3)
+    verify(!p.due(5000, true))
+    p.observe(14999, 1)
+    verify(p.phase == PresenceRetry.Phase.Pending)
+    p.observe(15000, 1)
+    verify(p.phase == PresenceRetry.Phase.Retry)
+    verify(!p.due(19999, true))
+    verify(p.due(20000, false))
+    p.begin(20000, 3)
+    p.observe(20100, 3)
+    verify(!p.due(30099, true))
+    verify(p.due(30100, false))
+    p.begin(30100, 3)
+    p.observe(30200, 2)
+    verify(p.phase == PresenceRetry.Phase.Accepted)
+    verify(!p.due(90099, false))
+    verify(p.due(90100, false))
+    p.requestRefresh()
+    verify(p.due(40000, false))
+    p.begin(40000, 3)
+    p.failed(40001)
+    p.observe(40002, 2)
+    verify(p.phase == PresenceRetry.Phase.Retry)
+    verify(!p.due(45000, true))
+    verify(p.due(45001, false))
+    p.reset()
+    verify(p.due(0, false))
+    println("Presence retry: $n checks passed")
+}

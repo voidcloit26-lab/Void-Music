@@ -52,10 +52,9 @@ class DiscordPresence @Inject constructor(
     // Main-dispatcher-confined transport state. No callback processing on audio threads.
     private var sent: NativePresencePayload? = null
     private var ownsActivity = false
-    private var nextSendAt = 0L
-    private var pendingSince = 0L
-    private var retryDelay = 5_000L
-    private var lastStatus = 0
+    private val retry = PresenceRetry()
+    private var lastAttachment = -1L
+    private var lastNudge = -1
     private var cachedAllowed = false
     private var nextAccessCheck = 0L
 
@@ -74,9 +73,18 @@ class DiscordPresence @Inject constructor(
     fun nudge() { nudges.update { it + 1 } }
 
     private suspend fun follow() {
-        combine(settings, _nowPlaying, NativePresenceBridge.ready, nudges, GuardianGate.changes) {
-            config, track, ready, _, _ -> Triple(config, track, ready)
-        }.collectLatest { (config, track, ready) ->
+        val transport = combine(NativePresenceBridge.ready, NativePresenceBridge.attachmentEpoch, nudges) {
+            ready, attachment, nudge -> Triple(ready, attachment, nudge)
+        }
+        combine(settings, _nowPlaying, transport, GuardianGate.changes) {
+            config, track, state, _ -> Triple(config, track, state)
+        }.collectLatest { (config, track, state) ->
+            val (ready, attachment, nudge) = state
+            if (attachment != lastAttachment || nudge != lastNudge) {
+                retry.requestRefresh()
+                lastAttachment = attachment
+                lastNudge = nudge
+            }
             nextAccessCheck = 0L
             if (!ready || !config.enabled || track == null) {
                 hide(if (config.enabled && ready) PresenceConnection.Idle else PresenceConnection.Off)
@@ -102,26 +110,22 @@ class DiscordPresence @Inject constructor(
                     config.sharePublicArtwork,
                 )
                 val status = runCatching { NativePresenceBridge.tick() }.getOrDefault(3)
-                if (status == 2) {
-                    _connection.value = PresenceConnection.Live
-                    retryDelay = 5_000L
-                } else if (status == 3 || (status == 1 && now - pendingSince >= 15_000L)) {
-                    if (lastStatus != 3) {
-                        sent = null
-                        nextSendAt = maxOf(nextSendAt, now + retryDelay)
-                        retryDelay = (retryDelay * 2).coerceAtMost(60_000L)
-                    }
-                    _connection.value = PresenceConnection.Retrying
-                }
-                lastStatus = if (status == 1 && now - pendingSince >= 15_000L) 3 else status
-                if (!equivalent(sent, payload) && now >= nextSendAt &&
-                    (status != 1 || now - pendingSince >= 15_000L)) {
-                    nextSendAt = now + maxOf(5_000L, config.refreshSeconds * 1_000L)
-                    pendingSince = now
-                    lastStatus = 1
+                retry.observe(now, status)
+                if (retry.due(now, !equivalent(sent, payload))) {
+                    retry.begin(now, config.refreshSeconds)
                     ownsActivity = true
-                    _connection.value = PresenceConnection.Connecting
-                    sent = if (runCatching { NativePresenceBridge.publish(payload) }.isSuccess) payload else null
+                    sent = if (runCatching { NativePresenceBridge.publish(payload) }.isSuccess) {
+                        payload
+                    } else {
+                        retry.failed(now)
+                        null
+                    }
+                }
+                _connection.value = when (retry.phase) {
+                    PresenceRetry.Phase.Idle -> PresenceConnection.Idle
+                    PresenceRetry.Phase.Pending -> PresenceConnection.Connecting
+                    PresenceRetry.Phase.Accepted -> PresenceConnection.Live
+                    PresenceRetry.Phase.Retry -> PresenceConnection.Retrying
                 }
                 delay(250L)
             }
@@ -130,9 +134,9 @@ class DiscordPresence @Inject constructor(
 
     private suspend fun hide(state: PresenceConnection) {
         _connection.value = state
-        if (!ownsActivity) return
         sent = null
-        lastStatus = 0
+        retry.reset()
+        if (!ownsActivity) return
         runCatching { NativePresenceBridge.clear() }
         // Pump pending clear callbacks. Preserve the flag if a new flow emission cancels this.
         repeat(4) {

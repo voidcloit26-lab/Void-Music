@@ -351,6 +351,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         if (guardianBlocked) return
+        // Refresh the engine Activity after returning to the foreground.
+        com.mochyy.mochymusic.discord.NativePresenceBridge.attach(this)
         playerConnection?.isUiVisible?.value = true
         // paired phones are checked on only when at least one device is paired, keeping PhoneLinkHost lazy otherwise
         if (!isTelevision() && com.mochyy.mochymusic.link.phone.PhoneLinkHost.hasPairedDevices(this)) {
@@ -435,7 +437,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         guardianBlocked = com.mochyy.mochymusic.guardian.GuardianGate.redirectIfLocked(this)
         if (guardianBlocked) return
-        com.mochyy.mochymusic.discord.NativePresenceBridge.attach(this)
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
                 com.mochyy.mochymusic.guardian.GuardianGate.watch(this@MainActivity) {

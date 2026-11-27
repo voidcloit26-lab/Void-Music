@@ -174,6 +174,7 @@ fun DiscordScreen(
             Spacer(Modifier.height(12.dp))
             DiscordProfileCard(
                 profile = null,
+                nativePreview = true,
                 track = track,
                 settings = settings,
                 modifier = Modifier.onGloballyPositioned { previewBottomPx = it.boundsInWindow().bottom },
