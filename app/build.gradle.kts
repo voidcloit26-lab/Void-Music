@@ -185,6 +185,7 @@ extensions.configure<ApplicationExtension> {
         }
         buildConfigField("Boolean", "VOID_GUARDIAN_V2_ENFORCED", guardianV2Enforced.toString())
         manifestPlaceholders["voidAllowBackup"] = (!guardianV2Enforced).toString()
+        manifestPlaceholders["voidNetworkSecurityConfig"] = if (guardianV2Enforced) "@xml/guardian_network_security_config" else "@xml/network_security_config"
         manifestPlaceholders["voidFullBackupContent"] = if (guardianV2Enforced) "@xml/guardian_no_backup_rules" else "@xml/backup_rules"
         manifestPlaceholders["voidDataExtractionRules"] = if (guardianV2Enforced) "@xml/guardian_no_data_transfer" else "@xml/data_extraction_rules"
         buildConfigField("Boolean", "VOID_GUARDIAN_ENFORCED", guardianEnforced.toString())
