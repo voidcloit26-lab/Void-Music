@@ -9,6 +9,7 @@ from guardian.access_store import AccessDenied
 from guardian.activation_api import RequestBudget
 from guardian.account_protocol_v2 import MAX_BODY
 from guardian.clerk_session import SessionDenied
+from guardian.clerk_profile import ProfileUnavailable
 from guardian.cloud_store import RevisionConflict
 from guardian.membership_rules import MembershipDenied
 from guardian.version_gate import UpdateRequired
@@ -84,6 +85,8 @@ class AccountAPI:
                 raise ValueError("invalid body")
             method=self.protocol.challenge if path=="/v2/challenge" else self.protocol.execute
             result=method(auth[7:],**data)
+        except ProfileUnavailable:
+            return reply("503 Service Unavailable",{"error":"identity_verification_unavailable"})
         except SessionDenied:
             return reply("401 Unauthorized",{"error":"invalid_session"})
         except (AccessDenied,MembershipDenied):
