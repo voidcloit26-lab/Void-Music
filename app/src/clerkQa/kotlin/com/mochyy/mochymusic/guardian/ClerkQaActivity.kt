@@ -7,7 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
+import com.mochyy.mochymusic.ui.theme.MochyTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import com.mochyy.mochymusic.BuildConfig
@@ -23,12 +23,12 @@ class ClerkQaActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val initialized = runCatching { ClerkQaBridge.initialize(applicationContext) }.isSuccess
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(Modifier.fillMaxSize()) {
+            MochyTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     if (initialized) {
                         ClerkGuardianQaHost("https://void-guardian-v2-stage.onrender.com", intent.getBooleanExtra("VOID_GATE_ENTRY", false))
                     } else {
-                        Text("Staging authentication is unavailable. Close this page and retry.")
+                        Text("Authentication is temporarily unavailable. Reopen VOID Music to retry.")
                     }
                 }
             }
