@@ -20,6 +20,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     var recognizedOwner by remember(client) { mutableStateOf(false) }
+    var onboarding by remember(client) { mutableStateOf("") }
+    var activationAvailable by remember(client) { mutableStateOf(false) }
     var businessOpen by remember(client) { mutableStateOf(false) }
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
     var linkRequired by remember(client) { mutableStateOf(false) }
@@ -85,6 +87,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 error = when (e.status) {
                     401 -> "Sign in again to continue."
                     403 -> "Access was not verified. Check the account or recovery code."
+                    400 -> "Account request is incompatible. Refresh or contact VOID support."
                     409 -> "The account state changed. Refresh before retrying."
                     429 -> "Too many requests. Try again later."
                     else -> "Guardian is unavailable. Refresh before retrying."
@@ -121,8 +124,21 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     suspend fun refreshIdentity() {
         recognizedOwner = false
         linkRequired = false
-        recognizedOwner = client.request("identity_role", emptyMap()).optString("role") == "owner"
-        refresh()
+        onboarding = ""
+        activationAvailable = false
+        val identity = client.request("identity_role", emptyMap())
+        recognizedOwner = identity.optString("role") == "owner"
+        onboarding = identity.optString("onboarding")
+        activationAvailable = identity.optBoolean("activation_available", true)
+        if (onboarding in setOf("owner_setup", "activation_required", "recovery_required", "device_conflict", "configuration_required")) {
+            result = null
+            lease.clear()
+            leaseVerified = false
+            if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
+            linkRequired = true
+        } else {
+            refresh()
+        }
     }
 
     BackHandler(enabled = newRecovery != null) { /* Save the one-time code before leaving. */ }
@@ -298,35 +314,49 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             Text("No audio files or automatic deletions. Automatic backup requires your explicit consent and a matching reviewed library.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else if (linkRequired) {
-            if (recognizedOwner) Button(onClick = {
-                run {
-                    val created = client.request("register_owner", emptyMap())
-                    newRecovery = created.getString("recovery")
-                    refresh()
+            Text(if (recognizedOwner) "Owner account" else "Complete your VOID account",
+                style = MaterialTheme.typography.titleMedium)
+            if (onboarding == "configuration_required") {
+                Text("Account activation is being configured. Your sign-in succeeded; no membership key is needed until this service is ready.")
+            } else if (onboarding == "device_conflict") {
+                Text("This device is registered to a different account. Sign in to the original account or contact VOID support.")
+            } else {
+                if (recognizedOwner && onboarding != "recovery_required") {
+                    Text("Your verified owner account includes lifetime access. No activation key is required.")
+                    Button(onClick = {
+                        run {
+                            val created = client.request("register_owner", emptyMap())
+                            newRecovery = created.getString("recovery")
+                            refresh()
+                        }
+                    }, enabled = !busy && newRecovery == null) { Text("Activate owner lifetime account") }
+                } else if (!recognizedOwner && onboarding != "recovery_required" && activationAvailable) {
+                    Text("New members need an activation key supplied by VOID.")
+                    OutlinedTextField(key, { key = it.trim().take(43) }, label = { Text("Activation key") },
+                        singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !busy,
+                        modifier = Modifier.fillMaxWidth())
+                    Button(onClick = {
+                        val entered = key
+                        key = ""
+                        run {
+                            val created = client.request("register_with_code", mapOf("code" to entered))
+                            newRecovery = created.getString("recovery")
+                            refresh()
+                        }
+                    }, enabled = !busy && newRecovery == null && Regex("[A-Za-z0-9_-]{43}").matches(key)) {
+                        Text("Activate my account")
+                    }
                 }
-            }, enabled = !busy) { Text("Activate owner lifetime account") }
-            Text("Complete your VOID account", style = MaterialTheme.typography.titleMedium)
-            Text("This device could not verify a linked account. If you are new, enter the activation key supplied by VOID. Existing members should use account recovery.")
-            OutlinedTextField(key, { key = it.trim().take(43) }, label = { Text("Activation key") },
-                singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !busy,
-                modifier = Modifier.fillMaxWidth())
-            Button(onClick = {
-                val entered = key
-                key = ""
-                run {
-                    val created = client.request("register_with_code", mapOf("code" to entered))
-                    newRecovery = created.getString("recovery")
-                    refresh()
+                if (onboarding == "recovery_required" || onboarding.isEmpty()) {
+                    Text("Recover your existing account on this device. This is not a new membership activation.")
+                    OutlinedTextField(recovery, { recovery = it.take(43) }, label = { Text("Existing recovery code") },
+                        singleLine = true, enabled = !busy, visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth())
+                    Button(onClick = { confirmRecovery = true },
+                        enabled = !busy && newRecovery == null && Regex("[A-Za-z0-9_-]{43}").matches(recovery)) {
+                        Text("Recover existing account")
+                    }
                 }
-            }, enabled = !busy && newRecovery == null && Regex("[A-Za-z0-9_-]{43}").matches(key)) {
-                Text("Activate my account")
-            }
-            OutlinedTextField(recovery, { recovery = it.take(43) }, label = { Text("Existing recovery code") },
-                singleLine = true, enabled = !busy, visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth())
-            Button(onClick = { confirmRecovery = true },
-                enabled = !busy && newRecovery == null && Regex("[A-Za-z0-9_-]{43}").matches(recovery)) {
-                Text("Recover existing account")
             }
         } else {
             Text(if (busy) "Checking your VOID account…" else "Account status unavailable. Refresh to continue safely.")
