@@ -6,7 +6,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -24,8 +23,6 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var busy by remember(client) { mutableStateOf(false) }
     var newRecovery by remember(client) { mutableStateOf<String?>(null) }
     var confirmRecovery by remember(client) { mutableStateOf(false) }
-    var renewalHelp by remember(client) { mutableStateOf(false) }
-    val uriHandler = LocalUriHandler.current
     var leaseVerified by remember(client) { mutableStateOf(false) }
     var cloudSummary by remember(client) { mutableStateOf<String?>(null) }
     var approvedBackup by remember(client) { mutableStateOf<GuardianQaCloud.FirstBackup?>(null) }
@@ -74,6 +71,16 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         run { refresh() }
     }
 
+    if (result?.optString("status") == "expired") {
+        GuardianExpiredMembership(busy, error) { entered ->
+            run {
+                client.request("redeem_activation", mapOf("code" to entered))
+                refresh()
+            }
+        }
+        return
+    }
+
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("VOID MUSIC", style = MaterialTheme.typography.headlineMedium)
@@ -91,19 +98,15 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 if (!it.isNull("expires_at")) Text("Expires: " +
                     java.text.DateFormat.getDateTimeInstance().format(java.util.Date(it.optLong("expires_at") * 1000L)))
             }
-            if (status == "unactivated" || status == "expired") {
+            if (status == "unactivated") {
                 OutlinedTextField(key, { key = it.take(43) }, label = { Text("Membership key") },
                     singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !busy,
                     modifier = Modifier.fillMaxWidth())
                 Button(onClick = {
                     val entered = key
                     key = ""
-                    run { client.request("redeem_free", mapOf("code" to entered)); refresh() }
-                }, enabled = !busy && Regex("[A-Za-z0-9_-]{43}").matches(key)) { Text("Redeem test key") }
-                if (status == "expired") {
-                    Text("Your membership has ended. Your account and library are preserved.")
-                    OutlinedButton(onClick = { renewalHelp = true }, enabled = !busy) { Text("Renew membership") }
-                }
+                    run { client.request("redeem_activation", mapOf("code" to entered)); refresh() }
+                }, enabled = !busy && Regex("[A-Za-z0-9_-]{43}").matches(key)) { Text("Redeem activation key") }
                 Text("No in-app payment. Contact support for membership assistance.")
             }
             if (status != "revoked") OutlinedButton(onClick = {
@@ -186,20 +189,6 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             }
         }, enabled = !busy && newRecovery == null) { Text("Sign out") }
     }
-    if (renewalHelp) AlertDialog(
-        onDismissRequest = { renewalHelp = false },
-        title = { Text("Renew your VOID membership") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Your existing account and saved library will be restored to full access after renewal.")
-                Text("Contact the owner through MARS Community, or open a membership renewal support ticket in the server. Never share passwords or recovery codes.")
-                OutlinedButton(onClick = {
-                    runCatching { uriHandler.openUri("https://discord.gg/marscm") }
-                        .onFailure { error = "Could not open Discord. Visit discord.gg/marscm." }
-                }) { Text("Join server and open ticket") }
-            }
-        },
-        confirmButton = { TextButton(onClick = { renewalHelp = false }) { Text("Back") } })
     if (confirmRecovery) AlertDialog(
         onDismissRequest = { confirmRecovery = false },
         title = { Text("Replace registered device?") },
