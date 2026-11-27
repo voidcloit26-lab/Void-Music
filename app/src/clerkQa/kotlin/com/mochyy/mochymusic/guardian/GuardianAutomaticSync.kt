@@ -41,6 +41,8 @@ internal object GuardianAutomaticSync {
             }
             check(stillCurrent())
             val baseline = cloud.prepareAutomatic(account)
+            require(baseline.account == account && baseline.revision in 1 until Long.MAX_VALUE &&
+                baseline.digest.matches(Regex("[a-f0-9]{64}")))
             synchronized(lock) {
                 if (generation != started || !stillCurrent() || configuration != null) return@synchronized false
                 configuration = Configuration(account, cloud, baseline, stillCurrent)
@@ -69,6 +71,8 @@ internal object GuardianAutomaticSync {
                 try {
                     check(selected.stillCurrent())
                     val updated = selected.cloud.automaticPass(account, selected.baseline)
+                    check(updated.account == account && updated.digest.matches(Regex("[a-f0-9]{64}")))
+                    check(updated == selected.baseline || updated.revision == selected.baseline.revision + 1)
                     synchronized(lock) {
                         if (configuration === selected) {
                             if (selected.stillCurrent()) {
