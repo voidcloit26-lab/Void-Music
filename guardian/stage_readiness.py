@@ -11,6 +11,9 @@ def reply(start, status, value):
     return [body]
 
 def create_app():
+    if os.environ.get("VOID_V2_STAGE_READINESS_ONLY") == "false":
+        from guardian.stage_app import create_app as create_account_app
+        return create_account_app()
     if os.environ.get("VOID_V2_STAGE_READINESS_ONLY") != "true":
         raise RuntimeError("Readiness-only mode must be explicit")
     configured = all(os.environ.get(k) for k in (
