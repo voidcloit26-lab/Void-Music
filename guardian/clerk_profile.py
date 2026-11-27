@@ -40,7 +40,22 @@ class ClerkProfileLookup:
                     raise ValueError("profile mismatch")
         except HTTPError as exc:
             # Record status only: never log credentials, user identifiers, URLs or response bodies.
-            logging.getLogger(__name__).warning("Clerk profile lookup HTTP status=%s", exc.code)
+            reason = "unknown"
+            try:
+                raw = exc.read(16385)
+                if len(raw) <= 16384:
+                    errors = json.loads(raw).get("errors", [])
+                    if isinstance(errors, list):
+                        codes = {item.get("code") for item in errors if isinstance(item, dict) and isinstance(item.get("code"), str)}
+                        for allowed in ("secret_key_ip_not_allowed", "authentication_invalid", "authorization_invalid", "resource_not_found"):
+                            if allowed in codes:
+                                reason = allowed
+                                break
+            except Exception:
+                pass
+            finally:
+                exc.close()
+            logging.getLogger(__name__).warning("Clerk profile lookup HTTP status=%s reason=%s", exc.code, reason)
             raise ProfileUnavailable("identity verification unavailable") from None
         except Exception as exc:
             logging.getLogger(__name__).warning("Clerk profile lookup failed (%s)", type(exc).__name__)
