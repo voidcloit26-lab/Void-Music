@@ -34,7 +34,7 @@ def invalid_constant(_):
 
 
 class BusinessAPI:
-    def __init__(self, store, *, sandbox=False, clock=time.monotonic, limit=120, budget=None):
+    def __init__(self, store, *, sandbox=False, clock=time.monotonic, limit=120, budget=None, clerk_mode=False, activation=None):
         if sandbox is not True:
             raise PermissionError('sandbox only')
         if type(limit) is not int or not 1 <= limit <= 120:
@@ -42,6 +42,13 @@ class BusinessAPI:
         self.store, self.clock, self.limit = store, clock, limit
         self.times, self.lock = deque(), threading.Lock()
         self.budget = budget
+        self.clerk_mode = clerk_mode
+        self.activation = activation
+        self.routes = dict(ROUTES)
+        if activation is not None:
+            self.routes.update({'/owner/v2/codes/create': ({'kind'}, {'days','ttl','count','subject'}),
+                                '/owner/v2/codes/list': (set(), {'limit'}),
+                                '/owner/v2/codes/cancel': ({'code_id'}, set())})
 
     def _take(self):
         if self.budget is not None:
@@ -70,7 +77,7 @@ class BusinessAPI:
         def reply(status, value):
             return self._reply(start, status, value)
         path = env.get('PATH_INFO', '')
-        if path not in ROUTES or env.get('QUERY_STRING'):
+        if path not in self.routes or env.get('QUERY_STRING'):
             return reply('404 Not Found', {'error': 'not_found'})
         if env.get('REQUEST_METHOD') != 'POST':
             return reply('405 Method Not Allowed', {'error': 'method_not_allowed'})
@@ -83,7 +90,8 @@ class BusinessAPI:
         if not allowed:
             return reply('429 Too Many Requests', {'error': 'retry_later'})
         auth = env.get('HTTP_AUTHORIZATION', '')
-        if not isinstance(auth, str) or not re.fullmatch(r'Bearer [A-Za-z0-9_-]{43}', auth):
+        pattern = r'Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+' if self.clerk_mode else r'Bearer [A-Za-z0-9_-]{43}'
+        if not isinstance(auth, str) or len(auth)>8199 or not re.fullmatch(pattern, auth):
             return reply('401 Unauthorized', {'error': 'owner_auth_required'})
         token = auth[7:]
         if env.get('CONTENT_TYPE', '').split(';', 1)[0].strip().lower() != 'application/json':
@@ -96,7 +104,7 @@ class BusinessAPI:
             if len(raw) != length:
                 raise ValueError('truncated body')
             data = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=invalid_constant)
-            required, optional = ROUTES[path]
+            required, optional = self.routes[path]
             if not isinstance(data, dict) or not required <= set(data) <= required | optional:
                 raise ValueError('invalid fields')
             if path == '/owner/v2/summary':
@@ -109,6 +117,12 @@ class BusinessAPI:
                 result = {'code': self.store.owner_issue_free(token, **data)}
             elif path == '/owner/v2/state':
                 result = {'changed': self.store.change_state(token, **data)}
+            elif path == '/owner/v2/codes/create':
+                result = {'codes': self.activation.issue(token, **data)}
+            elif path == '/owner/v2/codes/list':
+                result = {'codes': self.activation.list(token, **data)}
+            elif path == '/owner/v2/codes/cancel':
+                result = {'changed': self.activation.cancel(token, **data)}
             else:
                 result = {'events': self.store.audit(token, **data)}
         except BusinessDenied:

@@ -19,6 +19,8 @@ class VerifiedSession:
     issuer: str
     subject: str
     session_id: str
+    factor_age: tuple | None = None
+    issued_at: int | None = None
 
 
 class ClerkSessionVerifier:
@@ -56,4 +58,10 @@ class ClerkSessionVerifier:
                 raise ValueError('unauthorized party')
         except (jwt.PyJWTError, ValueError, TypeError, KeyError) as exc:
             raise SessionDenied('invalid session') from exc
+        fva = claims.get('fva')
+        if fva is not None:
+            if (not isinstance(fva,list) or len(fva)!=2 or
+                    any(type(x) is not int or not -1 <= x <= 1000000000 for x in fva)):
+                raise SessionDenied('invalid factor age')
+            return VerifiedSession(self.issuer,claims['sub'],claims['sid'],tuple(fva),claims['iat'])
         return VerifiedSession(self.issuer, claims['sub'], claims['sid'])
