@@ -97,7 +97,8 @@ internal fun ClerkGuardianQaHost(origin: String) {
                         Clerk.userFlow.value?.id == subject && Clerk.session?.id == sid
                     }
                 }
-                GuardianAccountQaScreen(client, lease, cloud, onSignOut = {
+                val business = remember(subject, sid) { GuardianBusinessQaClient(subject,sid) }
+                GuardianAccountQaScreen(client, lease, cloud, business, onSignOut = {
                     lease.clear()
                     ClerkQaBridge.signOut()
                 })

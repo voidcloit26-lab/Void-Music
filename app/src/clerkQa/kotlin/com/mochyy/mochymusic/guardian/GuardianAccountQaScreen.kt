@@ -14,8 +14,10 @@ import org.json.JSONObject
 
 /** Disconnected QA screen: no playback grant, no production payments. */
 @Composable
-internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, onSignOut: suspend () -> Unit) {
+internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, business: GuardianBusinessQaClient, onSignOut: suspend () -> Unit) {
     val scope = rememberCoroutineScope()
+    var recognizedOwner by remember(client) { mutableStateOf(false) }
+    var businessOpen by remember(client) { mutableStateOf(false) }
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
     var recovery by remember(client) { mutableStateOf("") }
     var key by remember(client) { mutableStateOf("") }
@@ -68,7 +70,15 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     }
 
     LaunchedEffect(client) {
-        run { refresh() }
+        run {
+            recognizedOwner = client.request("identity_role", emptyMap()).optString("role") == "owner"
+            refresh()
+        }
+    }
+
+    if (businessOpen && recognizedOwner) {
+        GuardianBusinessQaScreen(business) { businessOpen = false }
+        return
     }
 
     if (result?.optString("status") == "expired") {
@@ -93,6 +103,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             Text(account.optString("account"))
             val status = account.optString("status", "unknown")
             Text("Membership: " + status)
+            if (recognizedOwner && status == "active") Button(onClick = { businessOpen = true }, enabled = !busy) { Text("Guardian Business") }
             account.optJSONObject("membership")?.let {
                 Text("Plan: " + it.optString("kind"))
                 if (!it.isNull("expires_at")) Text("Expires: " +
@@ -160,6 +171,13 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             Text("No automatic uploads, audio files or overwrites. Only confirm if all reviewed local metadata belongs to you.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else {
+            if (recognizedOwner) Button(onClick = {
+                run {
+                    val created = client.request("register_owner", emptyMap())
+                    newRecovery = created.getString("recovery")
+                    refresh()
+                }
+            }, enabled = !busy) { Text("Activate owner lifetime account") }
             Text("Complete your VOID account", style = MaterialTheme.typography.titleMedium)
             Text("After verifying your email, enter the activation key supplied by VOID. Existing members should use account recovery instead.")
             OutlinedTextField(key, { key = it.trim().take(43) }, label = { Text("Activation key") },
@@ -188,6 +206,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         OutlinedButton(onClick = {
             run {
                 onSignOut()
+                recognizedOwner = false
+                businessOpen = false
                 result = null
                 key = ""
                 recovery = ""
