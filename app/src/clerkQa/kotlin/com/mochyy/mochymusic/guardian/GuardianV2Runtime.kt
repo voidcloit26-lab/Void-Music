@@ -93,7 +93,8 @@ internal object GuardianV2Runtime {
         if(!current(b)){clear(context);return false}
         val client=GuardianAccountClient(origin,{ClerkQaBridge.currentSession()},b.subject,b.session)
         val refreshed = authorize(context,client,b.account)
-        if (refreshed) GuardianAutomaticSync.schedule(b.account)
+        if (refreshed && allowed(context)) GuardianAutomaticSync.schedule(b.account)
+        else if (!allowed(context)) clear(context)
         return refreshed
     }
 
