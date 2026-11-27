@@ -16,7 +16,7 @@ import com.mochyy.mochymusic.BuildConfig
 class ClerkQaActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!BuildConfig.VOID_CLERK_QA_ENABLED || GuardianGate.enforced) {
+        if (!BuildConfig.VOID_CLERK_QA_ENABLED || (GuardianGate.enforced && !GuardianGate.v2Enforced)) {
             finish()
             return
         }

@@ -179,6 +179,11 @@ extensions.configure<ApplicationExtension> {
         buildConfigField("String", "VOID_CLERK_QA_PUBLISHABLE_KEY", "\"$clerkQaKey\"")
         buildConfigField("Boolean", "VOID_CLERK_QA_ENABLED", clerkQaEnabled.toString())
         manifestPlaceholders["voidClerkQaEnabled"] = clerkQaEnabled.toString()
+        val guardianV2Enforced = System.getenv("VOID_GUARDIAN_V2_ENFORCED") == "true"
+        require(!guardianV2Enforced || (clerkQaEnabled && !guardianEnforced)) {
+            "V2 staging gate requires Clerk enabled and V1 disabled"
+        }
+        buildConfigField("Boolean", "VOID_GUARDIAN_V2_ENFORCED", guardianV2Enforced.toString())
         buildConfigField("Boolean", "VOID_GUARDIAN_ENFORCED", guardianEnforced.toString())
         buildConfigField("String", "VOID_GUARDIAN_ORIGIN", "\"$guardianOrigin\"")
         buildConfigField("String", "VOID_GUARDIAN_PUBLIC_KEY", "\"$guardianPublicKey\"")

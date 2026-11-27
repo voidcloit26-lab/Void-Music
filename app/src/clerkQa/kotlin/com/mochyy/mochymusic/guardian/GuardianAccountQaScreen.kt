@@ -16,6 +16,7 @@ import org.json.JSONObject
 @Composable
 internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, business: GuardianBusinessQaClient, onSignOut: suspend () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var recognizedOwner by remember(client) { mutableStateOf(false) }
     var businessOpen by remember(client) { mutableStateOf(false) }
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
@@ -123,6 +124,14 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             if (status != "revoked") OutlinedButton(onClick = {
                 run { newRecovery = client.request("rotate_recovery", emptyMap()).getString("recovery") }
             }, enabled = !busy && newRecovery == null) { Text("Replace recovery code") }
+            if (status == "active" && GuardianGate.v2Enforced) {
+                Button(onClick = {
+                    run {
+                        check(GuardianV2Runtime.authorize(context.applicationContext, client, account.getString("account")))
+                        GuardianV2Runtime.openMusic(context)
+                    }
+                }, enabled = !busy) { Text("Enter VOID Music") }
+            }
             if (status == "active") {
                 OutlinedButton(onClick = {
                     run {
@@ -205,6 +214,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         OutlinedButton(onClick = { run { refresh() } }, enabled = !busy) { Text("Refresh membership") }
         OutlinedButton(onClick = {
             run {
+                if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
                 onSignOut()
                 recognizedOwner = false
                 businessOpen = false

@@ -19,7 +19,8 @@ import kotlinx.coroutines.withContext
  * An enforced build with missing/invalid configuration must remain locked.
  */
 object GuardianGate {
-    val enforced: Boolean get() = BuildConfig.VOID_GUARDIAN_ENFORCED
+    val v2Enforced: Boolean get() = BuildConfig.VOID_GUARDIAN_V2_ENFORCED
+    val enforced: Boolean get() = BuildConfig.VOID_GUARDIAN_ENFORCED || v2Enforced
     private val checkLock = Mutex()
     private var nextCheckAt = 0L
     private val revision = MutableStateFlow(0L)
@@ -43,8 +44,8 @@ object GuardianGate {
                 val now = SystemClock.elapsedRealtime()
                 if (now >= nextCheckAt && !com.mochyy.mochymusic.utils.OfflineMode.isOn) {
                     nextCheckAt = now + 60_000L
-                    val result = client(app)?.refresh()
-                    if (result == GuardianClient.Outcome.Active) {
+                    val active = if (v2Enforced) GuardianV2Runtime.refresh(app) else client(app)?.refresh() == GuardianClient.Outcome.Active
+                    if (active) {
                         nextCheckAt = SystemClock.elapsedRealtime() + 15 * 60_000L
                     }
                 }
@@ -58,7 +59,8 @@ object GuardianGate {
     }
 
     fun isAllowed(context: Context): Boolean =
-        !enforced || DeviceEntitlement.isActive(context.applicationContext, BuildConfig.VOID_GUARDIAN_PUBLIC_KEY)
+        if (v2Enforced) GuardianV2Runtime.allowed(context.applicationContext)
+        else !enforced || DeviceEntitlement.isActive(context.applicationContext, BuildConfig.VOID_GUARDIAN_PUBLIC_KEY)
 
     internal fun client(context: Context): GuardianClient? = runCatching {
         GuardianClient(context, BuildConfig.VOID_GUARDIAN_ORIGIN, BuildConfig.VOID_GUARDIAN_PUBLIC_KEY)
@@ -67,7 +69,7 @@ object GuardianGate {
     /** Do not preserve or replay untrusted launch intents after activation. */
     fun redirectIfLocked(activity: Activity): Boolean {
         if (isAllowed(activity)) return false
-        activity.startActivity(Intent(activity, GuardianActivationActivity::class.java))
+        activity.startActivity(Intent(activity, if (v2Enforced) ClerkQaActivity::class.java else GuardianActivationActivity::class.java))
         activity.finish()
         return true
     }

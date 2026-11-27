@@ -21,10 +21,11 @@ import javax.crypto.spec.GCMParameterSpec
  * fresh response obtained by a successful authenticated lease request.
  * Requires online refresh after reboot; never uses adjustable wall time.
  */
-internal class GuardianLeaseCache(context: Context, private val publicKey: PublicKey) {
+internal class GuardianLeaseCache(context: Context, private val publicKey: PublicKey, private val namespace: String = "qa") {
     private val app = context.applicationContext
-    private val storage = AtomicFile(File(app.noBackupFilesDir, "guardian_v2_lease"))
-    private val alias = "void_guardian_lease_cache_v2"
+    init { require(namespace in setOf("qa", "gate")) }
+    private val storage = AtomicFile(File(app.noBackupFilesDir, "guardian_v2_lease_$namespace"))
+    private val alias = "void_guardian_lease_cache_v2_$namespace"
     data class Anchor(val elapsedMs: Long, val boot: Int)
 
     fun anchor(): Anchor = Anchor(SystemClock.elapsedRealtime(),

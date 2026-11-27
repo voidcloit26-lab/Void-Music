@@ -28,7 +28,7 @@ internal object ClerkQaBridge {
     @Synchronized
     fun initialize(context: Context, publishableKey: String = BuildConfig.VOID_CLERK_QA_PUBLISHABLE_KEY) {
         require(Regex("pk_test_[A-Za-z0-9+/=_-]{8,512}").matches(publishableKey))
-        Clerk.initialize(context.applicationContext, publishableKey = publishableKey)
+        if (!Clerk.isInitialized.value) Clerk.initialize(context.applicationContext, publishableKey = publishableKey)
     }
 
     suspend fun currentSession(): GuardianAccountClient.Session {
