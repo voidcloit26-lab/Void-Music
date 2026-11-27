@@ -37,7 +37,7 @@ internal object GuardianV2Runtime {
 
     fun allowed(context:Context):Boolean = synchronized(stateLock) {
         val b=binding ?: return@synchronized false
-        runCatching { current(b) && cache(context).active(b.account) }.getOrDefault(false)
+        runCatching { current(b) && GuardianLocalLibraryOwner.status(context, b.account) == LocalLibraryBinding.Status.MATCH && cache(context).active(b.account) }.getOrDefault(false)
     }
 
     fun clear(context:Context) {
@@ -49,7 +49,7 @@ internal object GuardianV2Runtime {
         GuardianGate.changed()
     }
 
-    suspend fun authorize(context:Context,client:GuardianAccountClient,account:String):Boolean =
+    suspend fun authorize(context:Context,client:GuardianAccountClient,account:String,confirmLocalLibrary:Boolean = false):Boolean =
         mutex.withLock {
             withContext(Dispatchers.IO) {
                 try {
@@ -57,6 +57,7 @@ internal object GuardianV2Runtime {
                     val b=Binding(initial.subject,initial.sessionId,account)
                     val startGeneration=synchronized(stateLock){generation}
                     require(Regex("[a-f0-9]{32}").matches(account))
+                    if (!LocalLibraryBinding.canUse(GuardianLocalLibraryOwner.status(context, account), confirmLocalLibrary)) return@withContext false
                     val status=client.request("status",emptyMap())
                     if(status.getString("account")!=account || status.getString("status")!="active"){
                         clear(context);return@withContext false
@@ -70,8 +71,11 @@ internal object GuardianV2Runtime {
                     val saved=synchronized(stateLock) {
                         if(generation!=startGeneration || !current(b)) return@synchronized false
                         if(!lease.saveFresh(payload,sig,account,epoch,anchor)) return@synchronized false
+                        if (!lease.active(account) || !GuardianLocalLibraryOwner.claim(context, account, confirmLocalLibrary)) {
+                            lease.clear(); return@synchronized false
+                        }
                         binding=b
-                        lease.active(account)
+                        true
                     }
                     if(saved) GuardianGate.changed()
                     saved
