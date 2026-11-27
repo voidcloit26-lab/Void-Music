@@ -6,5 +6,5 @@ import android.content.Context
 internal object GuardianV2Runtime {
     fun allowed(context:Context):Boolean=false
     suspend fun refresh(context:Context):Boolean=false
-    fun clear(context:Context) { GuardianGate.changed() }
+    fun clearIfLocked(context:Context):Boolean { GuardianGate.changed(); return true }
 }
