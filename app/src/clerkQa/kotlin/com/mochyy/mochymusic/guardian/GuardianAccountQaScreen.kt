@@ -14,7 +14,7 @@ import org.json.JSONObject
 
 /** Disconnected QA screen: no playback grant, no production payments. */
 @Composable
-internal fun GuardianAccountQaScreen(client: GuardianAccountClient, onSignOut: suspend () -> Unit) {
+internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, onSignOut: suspend () -> Unit) {
     val scope = rememberCoroutineScope()
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
     var recovery by remember(client) { mutableStateOf("") }
@@ -23,9 +23,15 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, onSignOut: s
     var busy by remember(client) { mutableStateOf(false) }
     var newRecovery by remember(client) { mutableStateOf<String?>(null) }
     var confirmRecovery by remember(client) { mutableStateOf(false) }
+    var leaseVerified by remember(client) { mutableStateOf(false) }
+    var cloudSummary by remember(client) { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
         result = client.request("status", emptyMap())
+        if (result?.optString("status") != "active") {
+            lease.clear()
+            leaseVerified = false
+        }
     }
 
     fun run(action: suspend () -> Unit) {
@@ -38,7 +44,12 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, onSignOut: s
             } catch (e: CancellationException) {
                 throw e
             } catch (e: GuardianAccountClient.RequestFailed) {
-                if (e.status == 401 || e.status == 403) result = null
+                if (e.status == 401 || e.status == 403) {
+                    result = null
+                    lease.clear()
+                    leaseVerified = false
+                    cloudSummary = null
+                }
                 error = when (e.status) {
                     401 -> "Sign in again to continue."
                     403 -> "Access was not verified. Check the account or recovery code."
@@ -89,6 +100,37 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, onSignOut: s
             if (status != "revoked") OutlinedButton(onClick = {
                 run { newRecovery = client.request("rotate_recovery", emptyMap()).getString("recovery") }
             }, enabled = !busy && newRecovery == null) { Text("Replace recovery code") }
+            if (status == "active") {
+                OutlinedButton(onClick = {
+                    run {
+                        leaseVerified = false
+                        leaseVerified = lease.refresh(account.getString("account"))
+                        check(leaseVerified)
+                    }
+                }, enabled = !busy) { Text("Verify offline membership") }
+                OutlinedButton(onClick = {
+                    run { leaseVerified = lease.checkCached(account.getString("account")) }
+                }, enabled = !busy) { Text("Check cached authorization") }
+                Text(if (leaseVerified) "Signed lease verified" else "Offline lease not verified")
+            }
+            OutlinedButton(onClick = {
+                run {
+                    cloudSummary = null
+                    val remote = client.request("cloud_read", emptyMap())
+                    val revision = remote.getLong("revision")
+                    require(revision >= 0L)
+                    cloudSummary = if (remote.isNull("library")) {
+                        require(revision == 0L)
+                        "No cloud backup yet"
+                    } else {
+                        require(revision > 0L)
+                        val library = GuardianCloudRestore.parse(remote.getJSONObject("library"))
+                        "Revision $revision: ${library.favorites.size} favorites, ${library.playlists.size} playlists"
+                    }
+                }
+            }, enabled = !busy) { Text("Inspect cloud backup") }
+            cloudSummary?.let { Text(it) }
+            Text("Cloud inspection is read-only. No local library data is uploaded.")
             Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
         } else {
             Button(onClick = {
@@ -114,6 +156,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, onSignOut: s
                 key = ""
                 recovery = ""
                 newRecovery = null
+                leaseVerified = false
+                cloudSummary = null
             }
         }, enabled = !busy && newRecovery == null) { Text("Sign out") }
     }

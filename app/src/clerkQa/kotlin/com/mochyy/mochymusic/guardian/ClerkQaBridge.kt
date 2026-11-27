@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -79,7 +81,20 @@ internal fun ClerkGuardianQaHost(origin: String) {
                     GuardianAccountClient(origin, session = { ClerkQaBridge.currentSession() },
                         expectedSubject = subject, expectedSessionId = sid)
                 }
-                GuardianAccountQaScreen(client, onSignOut = { ClerkQaBridge.signOut() })
+                val context = LocalContext.current
+                val lease = remember(client, context.applicationContext) {
+                    GuardianQaLease(context, client) {
+                        Clerk.userFlow.value?.id == subject && Clerk.session?.id == sid
+                    }
+                }
+                DisposableEffect(lease) {
+                    lease.clear()
+                    onDispose { lease.close() }
+                }
+                GuardianAccountQaScreen(client, lease, onSignOut = {
+                    lease.clear()
+                    ClerkQaBridge.signOut()
+                })
             }
         }
     }
