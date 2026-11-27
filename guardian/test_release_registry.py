@@ -52,6 +52,26 @@ class RegistryTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=4) as pool:
             self.assertEqual(sum(pool.map(lambda _: self.registry.publish(*signed),range(8))),1)
 
+    def test_new_sequence_cannot_downgrade_or_substitute(self):
+        from dataclasses import replace
+        original = ReleasePolicy(1, 75, 74, "1.0.0", "a"*64, "b"*64, 1234, self.now, self.now+120)
+        def publish(policy):
+            payload = policy.canonical()
+            return self.registry.publish(payload, self.key.sign(payload, ec.ECDSA(hashes.SHA256())))
+        self.assertTrue(publish(original))
+        for change in (
+            {"latest":74}, {"minimum":73}, {"signer_sha256":"c"*64},
+            {"apk_sha256":"c"*64}, {"apk_bytes":1235}, {"version_name":"1.0.1"},
+        ):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                publish(replace(original, sequence=2, **change))
+        self.assertTrue(publish(replace(original, sequence=2, expires_at=self.now+240)))
+        self.assertTrue(publish(replace(original, sequence=3, latest=76, minimum=76,
+                                        version_name="1.0.1", apk_sha256="d"*64)))
+        self.assertEqual(self.registry.current()[0],
+                         replace(original, sequence=3, latest=76, minimum=76,
+                                 version_name="1.0.1", apk_sha256="d"*64).canonical())
+
     def test_requires_sandbox(self):
         with self.assertRaises(PermissionError):
             ReleaseRegistry(self.path,self.key.public_key())
