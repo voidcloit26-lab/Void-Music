@@ -9,6 +9,7 @@ internal object AccountProofV2 {
         "register_with_code" to setOf("code"), "redeem_activation" to setOf("code"),
         "identity_role" to emptySet(), "register_owner" to emptySet(),
         "rotate_recovery" to emptySet(), "lease" to emptySet(),
+        "lease_versioned" to setOf("version_code", "signer_sha256"),
         "status" to emptySet(), "redeem_free" to setOf("code"),
         "cloud_read" to emptySet(), "cloud_write" to setOf("revision", "library"),
         "cloud_clear" to setOf("revision"), "release_policy" to emptySet()
@@ -52,6 +53,12 @@ internal object AccountProofV2 {
 
     fun canonicalBody(action: String, body: Map<String, Any?>): String {
         require(actions[action] == body.keys)
+        if (action == "lease_versioned") {
+            val version = body["version_code"]
+            require(version is Int || version is Long)
+            require((version as Number).toLong() in 1L..2100000000L)
+            require((body["signer_sha256"] as? String)?.matches(Regex("[a-f0-9]{64}")) == true)
+        }
         if ("revision" in body) {
             val revision = body["revision"]
             require(revision is Int || revision is Long)
