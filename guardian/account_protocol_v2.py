@@ -71,7 +71,7 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None, require_activation=False):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
@@ -79,6 +79,7 @@ class AccountProtocol:
         self.profile_lookup = profile_lookup
         self.owner_bootstrap = owner_bootstrap
         self.release_registry = release_registry
+        self.require_activation = require_activation is True
         self.max_pending = max_pending
         self.pending = {}
         self.lock = threading.Lock()
@@ -87,6 +88,8 @@ class AccountProtocol:
         session = self.verifier.verify(token)
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
+        if self.require_activation and action in ("register", "redeem_free"):
+            raise MembershipDenied("legacy activation disabled")
         if action == "release_policy" and self.release_registry is None:
             raise MembershipDenied("release checks disabled")
         # Except for registration and recovery, only the current linked device may allocate challenges.
@@ -139,8 +142,27 @@ class AccountProtocol:
                 if self.pending.get(nonce) != pending or pending[1] <= self.clock():
                     raise AccessDenied("invalid challenge")
                 del self.pending[nonce]
+        if self.require_activation and action in ("register", "redeem_free"):
+            raise MembershipDenied("legacy activation disabled")
         if action == "identity_role":
-            return {"role":self.owner_bootstrap.role(session) if self.owner_bootstrap is not None else "member"}
+            role = self.owner_bootstrap.role(session) if self.owner_bootstrap is not None else "member"
+            identity = self.store._identity(session.issuer, session.subject)
+            device = self.store._device(fingerprint)
+            with self.store.transaction() as db:
+                row = db.execute("SELECT a.device FROM accounts_v2 a JOIN external_identity_v2 e ON e.account=a.id WHERE e.identity=?", (identity,)).fetchone()
+                if row:
+                    onboarding = "linked" if row[0] == device else "recovery_required"
+                elif db.execute("SELECT 1 FROM accounts_v2 WHERE device=?", (device,)).fetchone():
+                    onboarding = "device_conflict"
+                elif role == "owner":
+                    onboarding = "owner_setup"
+                elif self.require_activation and self.activation_codes is None:
+                    onboarding = "configuration_required"
+                else:
+                    onboarding = "activation_required"
+            return {"role": role, "onboarding": onboarding,
+                    "activation_available": self.activation_codes is not None,
+                    "owner_configured": self.owner_bootstrap is not None}
         if action == "register_owner":
             if self.owner_bootstrap is None:
                 raise MembershipDenied("owner bootstrap disabled")
