@@ -50,7 +50,12 @@ object AppModule {
         // The one list in MusicDatabase.kt. This copy used to be its own, stopped at 35 -> 36, and
         // every later version reached the phone as "no migration path" -> all tables dropped.
         .addMigrations(*com.mochyy.mochymusic.db.AllMigrations)
-        .fallbackToDestructiveMigration(dropAllTables = true)
+        .apply {
+            // Protected libraries must never be erased on a missing migration.
+            if (!com.mochyy.mochymusic.BuildConfig.VOID_GUARDIAN_V2_ENFORCED) {
+                fallbackToDestructiveMigration(dropAllTables = true)
+            }
+        }
         .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
         .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(2))
         .setQueryExecutor(java.util.concurrent.Executors.newFixedThreadPool(2))
