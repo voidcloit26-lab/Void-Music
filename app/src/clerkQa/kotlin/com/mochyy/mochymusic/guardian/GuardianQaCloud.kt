@@ -16,15 +16,16 @@ internal class GuardianQaCloud(
     data class UpdatePreview(val account: String, val revision: Long, val remoteDigest: String, val local: GuardianCloudSnapshot.Preview)
     data class RestorePreview(val account: String, val revision: Long, val library: CloudRestorePlan.Library, val plan: CloudRestorePlan.Plan)
 
-    private suspend fun requireAccount(account: String) {
+    private suspend fun requireAccount(account: String, active: Boolean = false) {
         require(account.matches(Regex("[a-f0-9]{32}")))
         check(isCurrent())
         val status = client.request("status", emptyMap())
         check(isCurrent() && status.getString("account") == account)
+        if (active) check(status.getString("status") == "active") { "Active membership required" }
     }
 
     suspend fun previewFirst(account: String): FirstBackup {
-        requireAccount(account)
+        requireAccount(account, active = true)
         val remote = client.request("cloud_read", emptyMap())
         check(remote.getLong("revision") == 0L && remote.isNull("library")) {
             "Existing backup must not be overwritten"
@@ -36,7 +37,7 @@ internal class GuardianQaCloud(
 
     suspend fun confirmFirst(approved: FirstBackup, confirmed: Boolean): Long {
         require(confirmed)
-        requireAccount(approved.account)
+        requireAccount(approved.account, active = true)
         val local = GuardianCloudSnapshot.capture(database)
         check(local == approved.preview && isCurrent()) { "Library changed; preview again" }
         // Compare-and-swap with revision zero prevents overwriting any existing backup,
@@ -63,9 +64,7 @@ internal class GuardianQaCloud(
 
     suspend fun confirmRestore(approved: RestorePreview, confirmed: Boolean) {
         require(confirmed && approved.plan.ready)
-        requireAccount(approved.account)
-        val status = client.request("status", emptyMap())
-        check(status.getString("account") == approved.account && status.getString("status") == "active")
+        requireAccount(approved.account, active = true)
         val remote = client.request("cloud_read", emptyMap())
         check(remote.getLong("revision") == approved.revision && !remote.isNull("library"))
         val library = GuardianCloudRestore.parse(remote.getJSONObject("library"))
@@ -85,7 +84,7 @@ internal class GuardianQaCloud(
 
     /** Manual update only. Existing remote metadata is a strict lower bound. */
     suspend fun previewUpdate(account: String): UpdatePreview {
-        requireAccount(account)
+        requireAccount(account, active = true)
         val remote = client.request("cloud_read", emptyMap())
         val revision = remote.getLong("revision")
         require(revision > 0L && !remote.isNull("library"))
