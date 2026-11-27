@@ -2,7 +2,8 @@
 from contextlib import closing, contextmanager
 import sqlite3
 import time
-from guardian.release_policy import verify_policy
+from guardian.release_policy import ReleasePolicy, verify_policy
+import json
 
 class ReleaseRegistry:
     def __init__(self, path, public_key, *, sandbox=False, clock=time.time):
@@ -36,6 +37,19 @@ class ReleaseRegistry:
                     if row[1] != payload:
                         raise ValueError('sequence reuse')
                     return False
+                previous = ReleasePolicy(**json.loads(row[1].decode("ascii")))
+                if candidate.latest < previous.latest:
+                    raise ValueError("latest version rollback")
+                if candidate.minimum < previous.minimum:
+                    raise ValueError("minimum version rollback")
+                if candidate.signer_sha256 != previous.signer_sha256:
+                    raise ValueError("APK signing identity changed")
+                if candidate.latest == previous.latest and (
+                    candidate.apk_sha256 != previous.apk_sha256 or
+                    candidate.apk_bytes != previous.apk_bytes or
+                    candidate.version_name != previous.version_name
+                ):
+                    raise ValueError("different APK for existing version")
             db.execute('INSERT INTO releases_v2 VALUES (?,?,?,?)', (candidate.sequence,payload,signature,now))
             return True
 
