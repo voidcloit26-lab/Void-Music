@@ -1,5 +1,12 @@
 package com.mochyy.mochymusic.guardian
 
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import com.mochyy.mochymusic.constants.RepeatModeKey
+import com.mochyy.mochymusic.constants.ShuffleModeKey
+import com.mochyy.mochymusic.constants.RememberShuffleAndRepeatKey
+import com.mochyy.mochymusic.utils.dataStore
+import kotlinx.coroutines.flow.first
 import com.mochyy.mochymusic.db.MusicDatabase
 import org.json.JSONObject
 import org.json.JSONArray
@@ -8,11 +15,13 @@ import org.json.JSONArray
  * Local storage is shared; consent must establish the user's ownership.
  */
 internal class GuardianQaCloud(
+    context: Context,
     private val database: MusicDatabase,
     private val client: GuardianAccountClient,
     private val ownsLibrary: (String) -> Boolean,
     private val isCurrent: () -> Boolean
 ) {
+    private val settings = context.applicationContext.dataStore
     data class FirstBackup(val account: String, val preview: GuardianCloudSnapshot.Preview)
     data class UpdatePreview(val account: String, val revision: Long, val remoteDigest: String, val local: GuardianCloudSnapshot.Preview)
     data class RestorePreview(val account: String, val revision: Long, val library: CloudRestorePlan.Library, val plan: CloudRestorePlan.Plan)
@@ -115,5 +124,60 @@ internal class GuardianQaCloud(
             mapOf("revision" to approved.revision, "library" to approved.local.body))
         check(isCurrent())
         return response.getLong("revision").also { check(it == approved.revision + 1) }
+    }
+
+    data class PreferencePreview(val account: String, val revision: Long, val digest: String,
+        val local: GuardianPlaybackPreferences.Saved, val remote: GuardianPlaybackPreferences.Saved?)
+
+    private suspend fun savedPlayback(): GuardianPlaybackPreferences.Saved {
+        val prefs = settings.data.first()
+        return GuardianPlaybackPreferences.capture(prefs[RepeatModeKey] ?: 0, prefs[ShuffleModeKey] ?: false)
+    }
+
+    private fun prefsOf(body: Map<String, Any?>): Map<String, Any?> =
+        requireNotNull(body["preferences"] as? Map<*, *>).entries.associate { (key, value) ->
+            requireNotNull(key as? String) to value
+        }
+
+    suspend fun previewPreferences(account: String): PreferencePreview {
+        requireAccount(account, active = true)
+        val remote = client.request("cloud_read", emptyMap())
+        val revision = remote.getLong("revision")
+        require(revision > 0L && !remote.isNull("library")) { "Create a library backup first" }
+        val body = remoteBody(remote)
+        val digest = CloudMetadata.parse(body).digest()
+        val local = savedPlayback()
+        check(isCurrent() && ownsLibrary(account))
+        return PreferencePreview(account, revision, digest, local,
+            GuardianPlaybackPreferences.read(prefsOf(body)))
+    }
+
+    suspend fun savePreferences(approved: PreferencePreview, confirmed: Boolean): Long {
+        require(confirmed)
+        check(previewPreferences(approved.account) == approved) { "Settings or backup changed; preview again" }
+        val remote = client.request("cloud_read", emptyMap())
+        check(remote.getLong("revision") == approved.revision && !remote.isNull("library"))
+        val body = remoteBody(remote)
+        check(CloudMetadata.parse(body).digest() == approved.digest)
+        val next = body + ("preferences" to GuardianPlaybackPreferences.merge(prefsOf(body), approved.local))
+        CloudMetadata.parse(next)
+        check(isCurrent() && ownsLibrary(approved.account) && savedPlayback() == approved.local)
+        val response = client.request("cloud_write", mapOf("revision" to approved.revision, "library" to next))
+        check(isCurrent() && ownsLibrary(approved.account))
+        return response.getLong("revision").also { check(it == approved.revision + 1) }
+    }
+
+    suspend fun restorePreferences(approved: PreferencePreview, confirmed: Boolean) {
+        require(confirmed)
+        val remote = requireNotNull(approved.remote)
+        check(previewPreferences(approved.account) == approved) { "Settings or backup changed; preview again" }
+        settings.edit { prefs ->
+            check(isCurrent() && ownsLibrary(approved.account))
+            check(GuardianPlaybackPreferences.capture(prefs[RepeatModeKey] ?: 0, prefs[ShuffleModeKey] ?: false) == approved.local)
+            prefs[RepeatModeKey] = remote.repeatMode()
+            prefs[ShuffleModeKey] = remote.shuffle
+            prefs[RememberShuffleAndRepeatKey] = true
+            check(isCurrent() && ownsLibrary(approved.account))
+        }
     }
 }
