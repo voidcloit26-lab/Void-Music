@@ -1,3 +1,4 @@
+import io
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
@@ -32,6 +33,18 @@ class ProfileTests(unittest.TestCase):
             self.assertIn("401", logs.output[0])
             self.assertNotIn("sk_test_", logs.output[0])
             self.assertNotIn("user_test", logs.output[0])
+
+    def test_allowlist_diagnostic_redacts_metadata(self):
+        lookup = ClerkProfileLookup("sk_test_synthetic")
+        raw = b'{"errors":[{"code":"secret_key_ip_not_allowed","meta":{"ip":"198.51.100.7"},"message":"private"}]}'
+        error = HTTPError("https://example.test", 403, "denied", {}, io.BytesIO(raw))
+        with patch.object(lookup._opener, "open", side_effect=error):
+            with self.assertLogs("guardian.clerk_profile", level="WARNING") as logs:
+                with self.assertRaises(ProfileUnavailable):
+                    lookup("user_test")
+            self.assertIn("secret_key_ip_not_allowed", logs.output[0])
+            self.assertNotIn("198.51.100.7", logs.output[0])
+            self.assertNotIn("private", logs.output[0])
 
     def test_network_error_is_not_user_signout(self):
         lookup = ClerkProfileLookup("sk_test_synthetic")
