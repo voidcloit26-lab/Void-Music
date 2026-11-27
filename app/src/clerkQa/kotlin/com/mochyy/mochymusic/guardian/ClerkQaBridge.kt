@@ -33,6 +33,14 @@ import com.clerk.api.network.serialization.ClerkResult
 import com.mochyy.mochymusic.BuildConfig
 import com.mochyy.mochymusic.App
 import com.clerk.ui.auth.AuthView
+import com.clerk.api.ui.ClerkTheme
+import com.clerk.api.ui.ClerkColors
+import com.clerk.api.ui.ClerkDesign
+import com.clerk.api.ui.ClerkTypography
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.imePadding
+import com.mochyy.mochymusic.ui.theme.InterFontFamily
 
 /**
  * Explicit QA-only bridge. Not installed in the default source set, not
@@ -75,24 +83,43 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
             !initialized && initializationError != null -> Text("Authentication unavailable. Reopen the app to retry.")
             !initialized -> CircularProgressIndicator()
             user == null || activeSession == null -> Column(
-                Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+                Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Keep the brand header compact so the SDK's social buttons,
-                // password fields and verification steps retain the available viewport.
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(painter = painterResource(R.drawable.ic_mochy_mark), contentDescription = null,
-                        modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurface)
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text("VOID Music", style = MaterialTheme.typography.titleLarge)
-                        Text("Sign in or create your account", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                val colors = MaterialTheme.colorScheme
+                val font = InterFontFamily
+                val typography = MaterialTheme.typography
+                val palette = remember(colors) {
+                    ClerkColors(background = colors.background, foreground = colors.onBackground,
+                        primary = colors.primary, primaryForeground = colors.onPrimary,
+                        input = colors.surfaceVariant, inputForeground = colors.onSurface,
+                        muted = colors.surfaceVariant, mutedForeground = Color(0xFFB0B0B0),
+                        border = Color(0xFF333333), ring = colors.primary, danger = colors.error)
                 }
-                Box(Modifier.fillMaxWidth().weight(1f)) { AuthView() }
+                val theme = remember(palette, font, typography) {
+                    ClerkTheme(colors = palette, lightColors = palette, darkColors = palette,
+                        design = ClerkDesign(borderRadius = 18.dp),
+                        typography = ClerkTypography(
+                            displaySmall = typography.displaySmall,
+                            headlineLarge = typography.headlineLarge,
+                            headlineMedium = typography.headlineMedium,
+                            titleMedium = typography.titleMedium,
+                            titleSmall = typography.titleSmall,
+                            bodyLarge = typography.bodyLarge,
+                            bodyMedium = typography.bodyMedium,
+                            bodySmall = typography.bodySmall,
+                            labelMedium = typography.labelMedium,
+                            labelSmall = typography.labelSmall))
+                }
+                Column(Modifier.widthIn(max = 480.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                    GuardianBrandHeader("VOID Music", "Your music. Your account.")
+                }
+                Box(Modifier.weight(1f).widthIn(max = 480.dp).fillMaxWidth()) {
+                    AuthView(clerkTheme = theme, isDismissible = false)
+                }
+                Text("Secured by VOID Guardian", style = typography.bodySmall,
+                    color = colors.onSurface.copy(alpha = 0.56f),
+                    modifier = Modifier.padding(vertical = 8.dp))
             }
             else -> key(user?.id, activeSession?.id) { signedIn() }
         }
