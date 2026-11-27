@@ -24,6 +24,7 @@ from guardian.external_identity_store import ExternalIdentityStore
 from guardian.cloud_store import CloudStore
 from guardian.durable_challenges import DurableChallenges, ChallengeDenied
 from guardian.clerk_profile import verified_primary_email
+from guardian.version_gate import UpdateRequired
 
 
 class LinkedCloudStore(ExternalIdentityStore, CloudStore):
@@ -39,6 +40,7 @@ ACTIONS = {
     "recover": {"recovery"},
     "rotate_recovery": set(),
     "lease": set(),
+    "lease_versioned": {"version_code", "signer_sha256"},
     "status": set(),
     "redeem_free": {"code"},
     "cloud_read": set(),
@@ -52,6 +54,12 @@ MAX_BODY = 600 * 1024
 def canonical_body(action, body):
     if action not in ACTIONS or not isinstance(body, dict) or set(body) != ACTIONS[action]:
         raise ValueError("invalid action body")
+    if action == "lease_versioned":
+        import re
+        if type(body["version_code"]) is not int or not 1 <= body["version_code"] <= 2100000000:
+            raise ValueError("invalid installed version")
+        if not isinstance(body["signer_sha256"], str) or not re.fullmatch(r"[a-f0-9]{64}", body["signer_sha256"]):
+            raise ValueError("invalid installed signer")
     if "revision" in body and (type(body["revision"]) is not int or not 0 <= body["revision"] < 2**63-1):
         raise ValueError("invalid revision")
     if "recovery" in body and (not isinstance(body["recovery"], str) or len(body["recovery"]) != 43):
@@ -71,7 +79,7 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None, require_activation=False):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None, require_activation=False, version_gate=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
@@ -79,6 +87,7 @@ class AccountProtocol:
         self.profile_lookup = profile_lookup
         self.owner_bootstrap = owner_bootstrap
         self.release_registry = release_registry
+        self.version_gate = version_gate
         self.require_activation = require_activation is True
         self.max_pending = max_pending
         self.pending = {}
@@ -88,6 +97,10 @@ class AccountProtocol:
         session = self.verifier.verify(token)
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
+        if self.version_gate is not None and action == "lease":
+            raise UpdateRequired("legacy lease protocol disabled")
+        if action == "lease_versioned" and self.version_gate is None:
+            raise MembershipDenied("versioned leases disabled")
         if self.require_activation and action in ("register", "redeem_free"):
             raise MembershipDenied("legacy activation disabled")
         if action == "release_policy" and self.release_registry is None:
@@ -205,7 +218,13 @@ class AccountProtocol:
             return {"payload": b64(payload), "signature": b64(signature), "server_time": self.store._now()}
         if action == "rotate_recovery":
             return {"recovery": self.store.rotate_linked_recovery(session.issuer, session.subject, fingerprint)}
-        if action == "lease":
+        if action in ("lease", "lease_versioned"):
+            if action == "lease" and self.version_gate is not None:
+                raise UpdateRequired("legacy lease protocol disabled")
+            if action == "lease_versioned":
+                if self.version_gate is None:
+                    raise MembershipDenied("versioned leases disabled")
+                self.version_gate.require_supported(body["version_code"], body["signer_sha256"])
             if self.lease_key is None:
                 raise MembershipDenied("lease issuance disabled")
             member = self.store.membership(account, fingerprint)
