@@ -9,7 +9,7 @@ from guardian.account_protocol_v2 import AccountProtocol
 from guardian.durable_challenges import DurableChallenges
 from guardian.shared_budget import SharedBudget
 from guardian.stage_signing import load_signing_pair
-from guardian.stage_account_guard import AccountFairness, authorize_request
+from guardian.stage_account_guard import AccountFairness, SharedAccountFairness, authorize_request
 from guardian.activation_codes_v2 import ActivationCodes
 from guardian.clerk_profile import ClerkProfileLookup
 from guardian.owner_identity_policy import OwnerIdentityPolicy
@@ -51,7 +51,7 @@ def create_app():
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
                                    activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap,
                                    require_activation=True)
-        fairness = AccountFairness()
+        fairness = SharedAccountFairness(store) if os.environ.get('VOID_V2_SHARED_FAIRNESS_ENABLED') == 'true' else AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
     except Exception:
         raise RuntimeError('V2 staging configuration or database validation failed') from None
