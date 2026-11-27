@@ -1,14 +1,14 @@
-"""Locked staging service. No account or owner routes are exposed."""
+"""Locked staging service. Validate configured credentials without exposing them."""
+import base64
+import hmac
 import json
 import os
-
 
 def reply(start, status, value):
     body = json.dumps(value, separators=(",", ":")).encode("ascii")
     start(status, [("Content-Type", "application/json"), ("Cache-Control", "no-store"),
                    ("X-Content-Type-Options", "nosniff"), ("Content-Length", str(len(body)))])
     return [body]
-
 
 def create_app():
     if os.environ.get("VOID_V2_STAGE_READINESS_ONLY") != "true":
@@ -23,6 +23,28 @@ def create_app():
                        issuer=os.environ["VOID_V2_CLERK_ISSUER"])
         except Exception:
             raise RuntimeError("V2 staging database readiness validation failed") from None
+    clerk_ok = False
+    signing_ok = False
+    try:
+        from guardian.clerk_session import ClerkSessionVerifier
+        ClerkSessionVerifier(issuer=os.environ["VOID_V2_CLERK_ISSUER"],
+            audience="void-music-api", public_key_pem=base64.b64decode(
+                os.environ["VOID_V2_CLERK_RSA_PEM_B64"], validate=True))
+        clerk_ok = True
+    except Exception:
+        pass
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from guardian.device_protocol import b64
+        key = serialization.load_der_private_key(base64.b64decode(
+            os.environ["VOID_V2_LEASE_PRIVATE_B64"], validate=True), password=None)
+        if isinstance(key, ec.EllipticCurvePrivateKey) and isinstance(key.curve, ec.SECP256R1):
+            public = b64(key.public_key().public_bytes(
+                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo))
+            signing_ok = hmac.compare_digest(public, os.environ["VOID_V2_LEASE_PUBLIC_KEY"])
+    except Exception:
+        pass
 
     def application(env, start):
         if env.get("PATH_INFO") not in ("/", "/healthz") or env.get("QUERY_STRING"):
@@ -30,8 +52,8 @@ def create_app():
         if env.get("REQUEST_METHOD") != "GET":
             return reply(start, "405 Method Not Allowed", {"error": "method_not_allowed"})
         return reply(start, "200 OK", {
-            "status": "ready" if configured else "configuration_required",
-            "mode": "staging-readiness-only",
-            "database_verified": configured,
+            "status": "ready" if configured and clerk_ok and signing_ok else "configuration_required",
+            "mode": "staging-readiness-only", "database_verified": configured,
+            "clerk_key_valid": clerk_ok, "signing_pair_valid": signing_ok,
             "account_routes_enabled": False})
     return application
