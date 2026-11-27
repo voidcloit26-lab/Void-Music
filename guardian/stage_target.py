@@ -5,9 +5,18 @@ import re
 DATABASE = 'void_guardian_v2_stage'
 ROLE = 'guardian_v2_stage_runtime'
 SCHEMA = 'guardian_v2_stage'
+BUSINESS_ROLE = 'guardian_v2_stage_business'
 
 
 def connection_options(url):
+    return _options(url, ROLE)
+
+
+def business_connection_options(url):
+    return _options(url, BUSINESS_ROLE)
+
+
+def _options(url, role):
     try:
         if not isinstance(url, str) or not 1 <= len(url) <= 4096:
             raise ValueError
@@ -17,7 +26,7 @@ def connection_options(url):
         host = parsed.hostname or ''
         if not re.fullmatch(r'[a-z0-9-]+(?:\.[a-z0-9-]+)*\.neon\.tech', host):
             raise ValueError
-        if parsed.username != ROLE or parsed.path != '/' + DATABASE or parsed.port not in (None, 5432):
+        if parsed.username != role or parsed.path != '/' + DATABASE or parsed.port not in (None, 5432):
             raise ValueError
         password = unquote(parsed.password or '', errors='strict')
         if not password or any(ord(c) < 32 for c in password):
@@ -28,7 +37,7 @@ def connection_options(url):
             raise ValueError
         if options.get('sslmode') != 'verify-full' or options.get('channel_binding', 'require') != 'require':
             raise ValueError
-        return dict(host=host, port=5432, dbname=DATABASE, user=ROLE,
+        return dict(host=host, port=5432, dbname=DATABASE, user=role,
                     password=password, sslmode='verify-full', channel_binding='require')
     except (ValueError, UnicodeError, TypeError):
         raise ValueError('Independent Guardian V2 staging target with verified TLS required') from None
