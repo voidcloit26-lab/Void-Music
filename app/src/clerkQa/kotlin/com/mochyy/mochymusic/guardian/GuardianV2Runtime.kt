@@ -40,14 +40,29 @@ internal object GuardianV2Runtime {
         runCatching { current(b) && GuardianLocalLibraryOwner.status(context, b.account) == LocalLibraryBinding.Status.MATCH && cache(context).active(b.account) }.getOrDefault(false)
     }
 
-    fun clear(context:Context) {
+    private fun revokeLocked(context: Context) {
+        generation++
+        binding = null
+        runCatching { cache(context).clear() }
+    }
+
+    fun clear(context: Context) {
+        synchronized(stateLock) { revokeLocked(context) }
+        GuardianAutomaticSync.disable()
+        GuardianGate.changed()
+    }
+
+    /** Recheck under the same lock as lease publication so a stale observer
+     * cannot revoke a freshly authorized session. Never hold stateLock while
+     * cancelling sync, whose session predicate also acquires stateLock. */
+    fun clearIfLocked(context: Context): Boolean {
         synchronized(stateLock) {
-            generation++
-            binding=null
-            runCatching { cache(context).clear() }
+            if (allowed(context)) return false
+            revokeLocked(context)
         }
         GuardianAutomaticSync.disable()
         GuardianGate.changed()
+        return true
     }
 
     suspend fun authorize(context:Context,client:GuardianAccountClient,account:String,confirmLocalLibrary:Boolean = false):Boolean =
@@ -94,7 +109,7 @@ internal object GuardianV2Runtime {
         val client=GuardianAccountClient(origin,{ClerkQaBridge.currentSession()},b.subject,b.session)
         val refreshed = authorize(context,client,b.account)
         if (refreshed && allowed(context)) GuardianAutomaticSync.schedule(b.account)
-        else if (!allowed(context)) clear(context)
+        else clearIfLocked(context)
         return refreshed
     }
 
