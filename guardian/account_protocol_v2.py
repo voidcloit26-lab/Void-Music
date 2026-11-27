@@ -45,6 +45,7 @@ ACTIONS = {
     "redeem_free": {"code"},
     "cloud_read": set(),
     "cloud_write": {"revision", "library"},
+    "backup_for_upgrade": {"revision", "library"},
     "cloud_clear": {"revision"},
     "release_policy": set(),
 }
@@ -246,6 +247,9 @@ class AccountProtocol:
         if action == "cloud_read":
             revision, library = self.store.read_library(account, fingerprint)
             return {"revision": revision, "library": library}
+        if action == "backup_for_upgrade":
+            revision, recovery = self.store.backup_for_upgrade(account, fingerprint, body["revision"], body["library"])
+            return {"revision": revision, "recovery": recovery}
         if action == "cloud_write":
             return {"revision": self.store.write_library(account, fingerprint, body["revision"], body["library"])}
         if action == "cloud_clear":
