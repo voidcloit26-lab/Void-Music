@@ -3,6 +3,10 @@ package com.mochyy.mochymusic.guardian
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -70,18 +74,23 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
         when {
             !initialized && initializationError != null -> Text("Authentication unavailable. Reopen the app to retry.")
             !initialized -> CircularProgressIndicator()
-            user == null || activeSession == null -> Column(Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            user == null || activeSession == null -> Column(
+                Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
+            ) {
+                // Keep the brand header compact so the SDK's social buttons,
+                // password fields and verification steps retain the available viewport.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(painter = painterResource(R.drawable.ic_mochy_mark), contentDescription = "VOID Music",
-                        modifier = Modifier.size(38.dp), tint = MaterialTheme.colorScheme.onSurface)
-                    Text("Welcome to VOID Music", style = MaterialTheme.typography.headlineMedium)
-                    Text("Your music. Your account. Sign in or create an account with your verified email.",
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Membership activation and device recovery are handled after sign-in.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(painter = painterResource(R.drawable.ic_mochy_mark), contentDescription = null,
+                        modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurface)
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("VOID Music", style = MaterialTheme.typography.titleLarge)
+                        Text("Sign in or create your account", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Box(Modifier.fillMaxWidth().weight(1f)) { AuthView() }
             }
