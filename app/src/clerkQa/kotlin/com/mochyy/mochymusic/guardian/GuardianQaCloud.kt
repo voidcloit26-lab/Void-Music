@@ -136,7 +136,8 @@ internal class GuardianQaCloud(
         check(remote.getLong("revision") == approved.revision && !remote.isNull("library"))
         val library = GuardianCloudRestore.parse(remote.getJSONObject("library"))
         check(library == approved.library && isCurrent()) { "Backup changed; preview again" }
-        GuardianCloudRestore.apply(database, library, approved.plan, confirmed = true, stillCurrent = isCurrent)
+        GuardianCloudRestore.apply(database, library, approved.plan, confirmed = true,
+            stillCurrent = { isCurrent() && ownsLibrary(approved.account) })
     }
 
     private fun convert(value: Any?): Any? = when (value) {
