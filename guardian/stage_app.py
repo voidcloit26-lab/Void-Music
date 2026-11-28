@@ -52,6 +52,9 @@ def create_app():
                 raise ValueError('verified activation must be enabled')
             policy = OwnerIdentityPolicy(issuer,json.loads(os.environ['VOID_V2_OWNER_IDENTITIES_JSON']))
             owner_bootstrap = OwnerBootstrap(store,policy,profile_lookup)
+        if os.environ.get('VOID_V2_OWNER_PROFILE_PROBE') == 'true' and owner_bootstrap is not None:
+            from guardian.owner_readiness_probe import check_owner_profile
+            check_owner_profile(policy, profile_lookup)
         registry = version_gate = None
         if os.environ.get('VOID_V2_STABLE_RELEASE_ENABLED') == 'true':
             encoded = os.environ['VOID_V2_RELEASE_PUBLIC_KEY']
