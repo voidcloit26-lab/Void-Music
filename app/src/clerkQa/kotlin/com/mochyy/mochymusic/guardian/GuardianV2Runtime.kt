@@ -140,12 +140,13 @@ internal object GuardianV2Runtime {
     private suspend fun configureAutomaticSync(app: Context, b: Binding, baseline: CloudSyncPolicy.Baseline?): Boolean {
         val active = { binding == b && current(b) && allowed(app) }
         val client = GuardianAccountClient(origin, { ClerkQaBridge.currentSession() }, b.subject, b.session)
-        val cloud = GuardianQaCloud(app, (app as com.mochyy.mochymusic.App).musicDatabase, client,
+        val database = (app as com.mochyy.mochymusic.App).musicDatabase
+        val cloud = GuardianQaCloud(app, database, client,
             ownsLibrary = { id -> GuardianLocalLibraryOwner.status(app, id) == LocalLibraryBinding.Status.MATCH },
             isCurrent = active)
         val enabled = GuardianAutomaticSync.enable(b.account, cloud, active, resume = baseline,
             onBaseline = { GuardianSyncConsent.write(app, it) },
-            onReview = { GuardianSyncConsent.clear(app) })
+            onReview = { GuardianSyncConsent.clear(app) }, changes = database.libraryChanges())
         if (enabled) GuardianAutomaticSync.schedule(b.account)
         return enabled
     }
