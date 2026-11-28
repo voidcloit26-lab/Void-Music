@@ -86,9 +86,14 @@ internal object GuardianStableUpdate {
             }
             return false
         }
+        val grant = client.request("release_download", mapOf("sequence" to release.sequence))
+        require(grant.keys().asSequence().toSet() == setOf("ticket", "expires_in"))
+        require(grant.getInt("expires_in") == 120)
+        val ticket = grant.getString("ticket")
+        require(Regex("[A-Za-z0-9_-]{43}").matches(ticket))
         val auth = ClerkQaBridge.currentSession()
         check(auth.subject == initial.subject && auth.sessionId == initial.sessionId)
-        updater.download(before.payload, before.signature, before.trustedNow(), null, auth.token)
+        updater.download(before.payload, before.signature, before.trustedNow(), null, auth.token, ticket)
         // A large download can outlive the trusted-time window. Obtain a fresh policy
         // and revalidate the exact release and active session before installation.
         val after = policy.check()
