@@ -26,6 +26,16 @@ class LeaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.read(signed,now=self.now+86400)
 
+    def test_shorter_release_policy_lease(self):
+        member=Membership('lifetime',None)
+        signed=issue(member,self.a,self.d,self.now,self.key,max_seconds=30)
+        self.assertEqual(self.read(signed).expires_at,self.now+30)
+        with self.assertRaises(ValueError):
+            self.read(signed,now=self.now+30)
+        for limit in (0,86401,True):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                issue(member,self.a,self.d,self.now,self.key,max_seconds=limit)
+
     def test_inactive_cannot_issue(self):
         for m in (Membership('annual',self.now),Membership('lifetime',None,'suspended'),Membership('lifetime',None,'revoked')):
             with self.assertRaises(MembershipDenied):
