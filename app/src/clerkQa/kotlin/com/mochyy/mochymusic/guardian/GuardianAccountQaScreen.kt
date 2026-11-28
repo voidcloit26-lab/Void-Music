@@ -23,6 +23,12 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var onboarding by remember(client) { mutableStateOf("") }
     var activationAvailable by remember(client) { mutableStateOf(false) }
     var businessOpen by remember(client) { mutableStateOf(false) }
+    var showAdvanced by remember(client) { mutableStateOf(false) }
+    var attemptedAutoEntry by remember(client) { mutableStateOf<JSONObject?>(null) }
+    var showClaim by remember(client) { mutableStateOf(false) }
+    var notice by remember(client) { mutableStateOf("") }
+    var showContact by remember(client) { mutableStateOf(false) }
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
     var updateState by remember(client) { mutableStateOf<GuardianStableUpdate.Check?>(null) }
     var dismissedRelease by remember(client) { mutableStateOf<Long?>(null) }
@@ -75,6 +81,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         if (busy) return
         busy = true
         error = ""
+        notice = ""
         scope.launch {
             try {
                 action()
@@ -121,6 +128,9 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             onSignOut()
             recognizedOwner = false
             businessOpen = false
+            showAdvanced = false
+            showClaim = false
+            showContact = false
             updateState = null
             dismissedRelease = null
             result = null
@@ -147,7 +157,13 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         recognizedOwner = identity.optString("role") == "owner"
         onboarding = identity.optString("onboarding")
         activationAvailable = identity.optBoolean("activation_available", true)
-        if (onboarding in setOf("owner_setup", "activation_required", "recovery_required", "device_conflict", "configuration_required")) {
+        if (onboarding == "owner_setup" && recognizedOwner) {
+            // Server-recognized, verified owner only. Do not bypass recovery or local library consent.
+            val created = client.request("register_owner", emptyMap())
+            newRecovery = created.getString("recovery")
+            onboarding = "linked"
+            refresh()
+        } else if (onboarding in setOf("activation_required", "recovery_required", "device_conflict", "configuration_required")) {
             result = null
             lease.clear()
             leaseVerified = false
@@ -160,12 +176,17 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
 
     BackHandler(enabled = newRecovery != null) { /* Save the one-time code before leaving. */ }
 
-    LaunchedEffect(client) {
-        run {
-            refreshIdentity()
-            val current = result
-            if (gateEntry && GuardianGate.v2Enforced && updateState == null && current?.optString("status") == "active" &&
-                GuardianLocalLibraryOwner.status(context, current.getString("account")) == LocalLibraryBinding.Status.MATCH) {
+    LaunchedEffect(client) { run { refreshIdentity() } }
+
+    // Enter playback only after verified entitlement and same-account local binding.
+    // Recovery code acknowledgement remains a one-time requirement.
+    LaunchedEffect(result, busy, newRecovery, updateState, gateEntry) {
+        val current = result
+        if (!busy && current !== attemptedAutoEntry && newRecovery == null && gateEntry && GuardianGate.v2Enforced &&
+            updateState == null && current?.optString("status") == "active" &&
+            GuardianLocalLibraryOwner.status(context, current.getString("account")) == LocalLibraryBinding.Status.MATCH) {
+            attemptedAutoEntry = current
+            run {
                 check(GuardianV2Runtime.authorize(context.applicationContext, client, current.getString("account")))
                 GuardianV2Runtime.openMusic(context)
             }
@@ -206,18 +227,23 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     }
 
     GuardianAccountLayout {
-        GuardianBrandHeader("Your account", "Membership & security")
+        GuardianBrandHeader("Your account", "VOID Music")
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (error.isNotEmpty()) GuardianAccountNotice(error)
+        if (notice.isNotEmpty()) Text(notice, color = MaterialTheme.colorScheme.primary)
         val account = result
         if (account != null) {
-            Text("VOID account", style = MaterialTheme.typography.titleMedium)
-            Text(account.optString("account"))
+            Text("VOID Premium", style = MaterialTheme.typography.headlineSmall)
             val status = account.optString("status", "unknown")
             val accountId = account.getString("account")
             val libraryOwner = GuardianLocalLibraryOwner.status(context, accountId)
             val libraryMatches = libraryOwner == LocalLibraryBinding.Status.MATCH
-            Text("Membership: " + status)
+            Text(when (status) {
+                "active" -> "Membership active"
+                "unactivated" -> "Activation required"
+                "revoked", "suspended" -> "Access restricted — contact owner"
+                else -> "Membership: $status"
+            })
             if (recognizedOwner && status == "active") Button(onClick = { businessOpen = true }, enabled = !busy) { Text("Guardian Business") }
             account.optJSONObject("membership")?.let {
                 Text("Plan: " + it.optString("kind"))
@@ -245,9 +271,6 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }, enabled = !busy && Regex("[A-Za-z0-9_-]{43}").matches(key)) { Text("Redeem activation key") }
                 Text("No in-app payment. Contact support for membership assistance.")
             }
-            if (status != "revoked") OutlinedButton(onClick = {
-                run { newRecovery = client.request("rotate_recovery", emptyMap()).getString("recovery") }
-            }, enabled = !busy && newRecovery == null) { Text("Replace recovery code") }
             if (status == "active" && GuardianGate.v2Enforced) {
                 when (libraryOwner) {
                     LocalLibraryBinding.Status.MATCH -> Button(onClick = {
@@ -263,6 +286,33 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     LocalLibraryBinding.Status.UNAVAILABLE -> Text("Local library ownership could not be verified. Access remains locked.", color = MaterialTheme.colorScheme.error)
                 }
             }
+            if (status == "active" && account.optJSONObject("membership")?.optString("kind") != "lifetime") {
+                OutlinedButton(onClick = { showClaim = !showClaim }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (showClaim) "Hide claim code" else "Claim / renew premium")
+                }
+                if (showClaim) {
+                    OutlinedTextField(key, { key = it.trim().take(43) }, label = { Text("Renewal code") },
+                        singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !busy,
+                        modifier = Modifier.fillMaxWidth())
+                    Button(onClick = {
+                        val entered = key
+                        key = ""
+                        run {
+                            client.request("redeem_activation", mapOf("code" to entered))
+                            refresh()
+                            showClaim = false
+                            notice = "Membership renewed."
+                        }
+                    }, enabled = !busy && Regex("[A-Za-z0-9_-]{43}").matches(key)) { Text("Claim code") }
+                }
+            }
+            OutlinedButton(onClick = { showAdvanced = !showAdvanced }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text(if (showAdvanced) "Hide account security & backup" else "Account security & backup")
+            }
+            if (showAdvanced) {
+            if (status != "revoked") OutlinedButton(onClick = {
+                run { newRecovery = client.request("rotate_recovery", emptyMap()).getString("recovery") }
+            }, enabled = !busy && newRecovery == null) { Text("Replace recovery code") }
             if (status == "active") {
                 OutlinedButton(onClick = {
                     run {
@@ -345,7 +395,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             }
             if (!libraryMatches) Text("Local backup and restore require a verified library owner.")
             Text("No audio files or automatic deletions. Automatic backup requires your explicit consent and a matching reviewed library.")
-            Text("This screen does not unlock playback. The signed entitlement gate remains separate.")
+            } // Advanced controls are hidden during normal account use.
         } else if (linkRequired) {
             Text(if (recognizedOwner) "Owner account" else "Complete your VOID account",
                 style = MaterialTheme.typography.titleMedium)
@@ -394,6 +444,12 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         } else {
             Text(if (busy) "Checking your VOID account…" else "Account status unavailable. Refresh to continue safely.")
         }
+        OutlinedButton(onClick = { showContact = !showContact }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Contact owner / get a code") }
+        if (showContact) {
+            TextButton(onClick = { runCatching { uri.openUri("https://discord.com/users/1472442073108971575") }.onFailure { error = "Could not open Discord." } }) { Text("Contact on Discord") }
+            TextButton(onClick = { runCatching { uri.openUri("https://discord.gg/marscm") }.onFailure { error = "Could not open MARS." } }) { Text("Join MARS Community") }
+        }
+        TextButton(onClick = { runCatching { uri.openUri("https://voidluxury.in") }.onFailure { error = "Could not open VOID Luxury." } }) { Text("VOID Luxury") }
         OutlinedButton(onClick = { run { refreshIdentity() } }, enabled = !busy && newRecovery == null) { Text("Refresh membership") }
         OutlinedButton(onClick = {
             signOutAccount()
