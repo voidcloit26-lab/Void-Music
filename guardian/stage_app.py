@@ -52,7 +52,8 @@ def create_app():
             from guardian.owner_readiness_probe import check_owner_profile
             check_owner_profile(policy, profile_lookup)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
-                                   activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap)
+                                   activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap,
+                                   require_activation=True)
         fairness = SharedAccountFairness(store) if os.environ.get('VOID_V2_SHARED_FAIRNESS_ENABLED') == 'true' else AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
     except Exception:
