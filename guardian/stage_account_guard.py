@@ -37,18 +37,22 @@ class AccountFairness:
 
 class SharedAccountFairness:
     """Bounded per-identity quotas across workers; no raw subjects stored."""
-    def __init__(self, store, *, limit=60, capacity=2048, clock=time.time):
+    def __init__(self, store, *, limit=60, capacity=2048, clock=time.time, scope='account'):
         if type(limit) is not int or not 1 <= limit <= 120:
             raise ValueError("invalid identity quota")
         if type(capacity) is not int or not 1 <= capacity <= 10000:
             raise ValueError("invalid identity capacity")
+        if scope not in ("account", "release-download"):
+            raise ValueError("invalid identity quota scope")
+        self.scope = scope
         self.store, self.limit, self.capacity, self.clock = store, limit, capacity, clock
         with store.transaction() as db:
             db.execute("SELECT identity,window_start,used FROM identity_budget_v2 LIMIT 0")
 
     def take(self, identity):
         issuer, subject = identity
-        digest = hmac.new(self.store.pepper, ("account-quota-v2:"+issuer+":"+subject).encode("ascii"),
+        domain = "account-quota-v2:" if self.scope == "account" else "release-download-quota-v2:"
+        digest = hmac.new(self.store.pepper, (domain+issuer+":"+subject).encode("ascii"),
                           hashlib.sha256).hexdigest()
         with self.store.transaction() as db:
             now = int(self.clock())
