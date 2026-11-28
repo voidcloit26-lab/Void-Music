@@ -275,14 +275,13 @@ internal class GuardianQaCloud(
         require(revision in 1 until Long.MAX_VALUE && !remote.isNull("library"))
         val body = remoteBody(remote)
         val local = GuardianCloudSnapshot.capture(database, preferences = prefsOf(body))
-        // A previously acknowledged exact snapshot and explicit consent permit
-        // local edits (including unlikes and playlist edits) to become the new
-        // cloud revision. An incomplete snapshot or remote divergence never wins.
+        // Do not automatically publish a destructive snapshot. Local edits which
+        // remove or replace metadata require a separate explicit review.
         val remoteDigest = CloudMetadata.parse(body).digest()
         val localDigest = CloudMetadata.parse(local.body).digest()
         check(isCurrent() && ownsLibrary(account))
         return when (AccountLibrarySyncPolicy.decide(baseline, revision, remoteDigest,
-            localDigest, local.excludedEntries)) {
+            localDigest, local.excludedEntries, CloudMetadata.parse(local.body).additiveTo(CloudMetadata.parse(body)))) {
             AccountLibrarySyncPolicy.Action.CURRENT -> baseline
             AccountLibrarySyncPolicy.Action.ALREADY_SAVED ->
                 CloudSyncPolicy.Baseline(account, revision, remoteDigest)
