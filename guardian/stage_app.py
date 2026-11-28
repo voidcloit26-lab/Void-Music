@@ -16,6 +16,8 @@ from guardian.owner_identity_policy import OwnerIdentityPolicy
 from guardian.owner_bootstrap import OwnerBootstrap
 from guardian.stage_release_registry import StageReleaseRegistry
 from guardian.version_gate import VersionGate
+from guardian.release_download import DownloadTickets, ReleaseFiles, ReleaseDownloadAPI
+from guardian.release_policy import verify_policy
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -55,7 +57,7 @@ def create_app():
         if os.environ.get('VOID_V2_OWNER_PROFILE_PROBE') == 'true' and owner_bootstrap is not None:
             from guardian.owner_readiness_probe import check_owner_profile
             check_owner_profile(policy, profile_lookup)
-        registry = version_gate = None
+        registry = version_gate = tickets = files = download_api = None
         if os.environ.get('VOID_V2_STABLE_RELEASE_ENABLED') == 'true':
             encoded = os.environ['VOID_V2_RELEASE_PUBLIC_KEY']
             raw = base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4))
@@ -65,14 +67,21 @@ def create_app():
             if not isinstance(release_key, ec.EllipticCurvePublicKey) or release_key.public_numbers() == key.public_key().public_numbers():
                 raise ValueError('separate release policy key required')
             registry = StageReleaseRegistry(store, release_key)
-            if registry.current() is None:
+            initial_release = registry.current()
+            if initial_release is None:
                 raise ValueError('verified initial release required')
+            files = ReleaseFiles(os.environ['VOID_V2_RELEASE_DIRECTORY'])
+            with files.open_verified(verify_policy(*initial_release, registry.public_key, int(registry.clock()))):
+                pass
+            tickets = DownloadTickets(store)
             version_gate = VersionGate(registry)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
                                    activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap,
-                                   require_activation=True, release_registry=registry, version_gate=version_gate)
+                                   require_activation=True, release_registry=registry, version_gate=version_gate, download_tickets=tickets)
         fairness = SharedAccountFairness(store) if os.environ.get('VOID_V2_SHARED_FAIRNESS_ENABLED') == 'true' else AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
+        if tickets is not None:
+            download_api = ReleaseDownloadAPI(verifier,registry,tickets,files,fairness,AccountAPI.reply)
     except Exception:
         raise RuntimeError('V2 staging configuration or database validation failed') from None
 
@@ -88,5 +97,7 @@ def create_app():
             denied = authorize_request(env, verifier, fairness)
             if denied is not None:
                 return AccountAPI.reply(start, *denied)
+        if download_api is not None and env.get('PATH_INFO','').startswith('/v2/releases/'):
+            return download_api(env,start)
         return api(env,start)
     return application
