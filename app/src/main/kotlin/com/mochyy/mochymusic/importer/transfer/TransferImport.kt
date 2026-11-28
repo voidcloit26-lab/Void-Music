@@ -36,6 +36,11 @@ class TransferImporter @Inject constructor(
 
     /** unpacks and converts source, onProgress goes from 0 to 1; once it succeeds the app restarts to finish */
     suspend fun stage(source: Uri, onProgress: (Float) -> Unit): Result<TransferManifest> = withContext(Dispatchers.IO) {
+        if (com.mochyy.mochymusic.BuildConfig.VOID_GUARDIAN_V2_ENFORCED) {
+            return@withContext Result.failure(TransferException(
+                "Full archive import is unavailable in protected VOID Music. Use VOID Account to restore your verified cloud library. Your local data has not been changed."
+            ))
+        }
         if (!running.tryLock()) return@withContext Result.failure(TransferException("An import is already running."))
         try {
             runCatching { unpackAndConvert(source, onProgress) }
