@@ -4,8 +4,10 @@ package com.mochyy.mochymusic.guardian
 internal object CloudRestorePlan {
     data class Playlist(val id: String, val name: String, val tracks: List<String>)
     data class Library(val favorites: List<String>, val playlists: List<Playlist>)
+    data class Append(val playlistId: String, val existingCount: Int, val tracks: List<String>)
     data class Plan(val addFavorites: List<String>, val addPlaylists: List<Playlist>,
-                    val missingTracks: Set<String>, val conflictingPlaylists: Set<String>) {
+                    val missingTracks: Set<String>, val conflictingPlaylists: Set<String>,
+                    val appendTracks: List<Append> = emptyList()) {
         val ready: Boolean get() = missingTracks.isEmpty() && conflictingPlaylists.isEmpty()
     }
     private val trackId = Regex("[A-Za-z0-9_-]{11}")
@@ -29,9 +31,20 @@ internal object CloudRestorePlan {
         validate(cloud)
         // A null local entry is a reserved, provider-managed or otherwise non-restorable playlist.
         val missing = (cloud.favorites + cloud.playlists.flatMap { it.tracks }).filterNot { it in eligibleTracks }.toSet()
-        val conflicts = cloud.playlists.filter { localPlaylists.containsKey(it.id) && localPlaylists[it.id] != it }
-            .map { it.id }.toSet()
+        val conflicts = mutableSetOf<String>()
+        val append = mutableListOf<Append>()
+        for (remote in cloud.playlists) {
+            if (!localPlaylists.containsKey(remote.id)) continue
+            val local = localPlaylists[remote.id]
+            when {
+                local == null || local.name != remote.name -> conflicts.add(remote.id)
+                local.tracks.take(remote.tracks.size) == remote.tracks -> Unit // local is equal or newer
+                remote.tracks.take(local.tracks.size) == local.tracks ->
+                    append.add(Append(remote.id, local.tracks.size, remote.tracks.drop(local.tracks.size)))
+                else -> conflicts.add(remote.id) // reorder, rename, divergent history
+            }
+        }
         return Plan(cloud.favorites.filterNot { it in localFavorites },
-            cloud.playlists.filterNot { localPlaylists.containsKey(it.id) }, missing, conflicts)
+            cloud.playlists.filterNot { localPlaylists.containsKey(it.id) }, missing, conflicts, append)
     }
 }
