@@ -111,3 +111,20 @@ class ExtendedLibraryStore:
     def clear_history(self, account, device, expected):
         # Clear listening history separately, even after membership expires.
         return self._replace(account, device, expected, EMPTY, clearing=True, history_only=True)
+
+
+def verify_stage(store):
+    """Require the migration and least-privilege runtime grants before enabling."""
+    table = "guardian_v2_stage.extended_library_v4"
+    with store.transaction() as db:
+        db.execute("SELECT account,revision,payload,updated_at FROM extended_library_v4 LIMIT 0")
+        for privilege in ("SELECT", "INSERT", "DELETE", "TRUNCATE", "UPDATE", "TRIGGER"):
+            allowed = db.execute("SELECT has_table_privilege(current_user,?,?)",
+                                 (table, privilege)).fetchone()[0]
+            if allowed != (privilege in ("SELECT", "INSERT")):
+                raise PermissionError("invalid extended library table grants")
+        for column in ("account", "revision", "payload", "updated_at"):
+            allowed = db.execute("SELECT has_column_privilege(current_user,?,?,'UPDATE')",
+                                 (table, column)).fetchone()[0]
+            if allowed != (column != "account"):
+                raise PermissionError("invalid extended library column grants")
