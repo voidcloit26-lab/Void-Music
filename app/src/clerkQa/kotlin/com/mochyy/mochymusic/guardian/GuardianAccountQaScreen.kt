@@ -1,6 +1,8 @@
 package com.mochyy.mochymusic.guardian
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -49,6 +51,9 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var approvedPreferences by remember(client) { mutableStateOf<GuardianQaCloud.PreferencePreview?>(null) }
     var confirmAutoSync by remember(client) { mutableStateOf<String?>(null) }
     var confirmCloudRestore by remember(client) { mutableStateOf<String?>(null) }
+    var approvedClear by remember(client) { mutableStateOf<GuardianQaCloud.ClearPreview?>(null) }
+    var exportAccount by remember(client) { mutableStateOf<String?>(null) }
+    var expiredDataPage by remember(client) { mutableStateOf(false) }
     val automaticSyncStatus by GuardianAutomaticSync.status.collectAsState()
 
     suspend fun refresh() {
@@ -103,6 +108,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     approvedRestore = null
                     approvedUpdate = null
                     approvedPreferences = null
+                    approvedClear = null
+                    exportAccount = null
                     if (GuardianGate.v2Enforced) GuardianV2Runtime.clear(context.applicationContext)
                 }
                 error = when (e.status) {
@@ -119,6 +126,18 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 error = "Could not verify your account. Check your connection."
             } finally {
                 busy = false
+            }
+        }
+    }
+
+    val exportDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { destination ->
+        val selected = exportAccount
+        exportAccount = null
+        if (destination != null && selected != null && result?.optString("account") == selected) {
+            run {
+                cloud.writeRemoteExport(selected, destination)
+                cloudSummary = "Cloud metadata exported to your selected file."
+                notice = "Cloud metadata exported."
             }
         }
     }
@@ -145,7 +164,10 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             approvedBackup = null
             approvedRestore = null
             approvedUpdate = null
-                    approvedPreferences = null
+            approvedPreferences = null
+            approvedClear = null
+            exportAccount = null
+            expiredDataPage = false
         }
     }
 
@@ -229,8 +251,9 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         return
     }
 
-    if (result?.optString("status") == "expired" && newRecovery == null) {
-        GuardianExpiredMembership(busy, error, onSignOut = if (newRecovery == null) ({ signOutAccount() }) else null) { entered ->
+    if (result?.optString("status") == "expired" && newRecovery == null && !expiredDataPage) {
+        GuardianExpiredMembership(busy, error, onSignOut = if (newRecovery == null) ({ signOutAccount() }) else null,
+            onManageData = { expiredDataPage = true; showAdvanced = true }) { entered ->
             run {
                 client.request("redeem_activation", mapOf("code" to entered))
                 refresh()
@@ -255,6 +278,9 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             val accountId = account.getString("account")
             val libraryOwner = GuardianLocalLibraryOwner.status(context, accountId)
             val libraryMatches = libraryOwner == LocalLibraryBinding.Status.MATCH
+            if (status == "expired") {
+                TextButton(onClick = { expiredDataPage = false; showAdvanced = false }, enabled = !busy) { Text("Back to renewal") }
+            }
             Text(when (status) {
                 "active" -> "Membership active"
                 "unactivated" -> "Activation required"
@@ -385,6 +411,23 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }
             }, enabled = !busy) { Text("Inspect cloud backup") }
             cloudSummary?.let { Text(it) }
+            if (status == "active" || status == "expired") {
+                Text("Cloud data controls", style = MaterialTheme.typography.titleSmall)
+                OutlinedButton(onClick = {
+                    exportAccount = accountId
+                    exportDocument.launch("void-music-library.json")
+                }, enabled = !busy && exportAccount == null && approvedClear == null && newRecovery == null) {
+                    Text("Export cloud library")
+                }
+                OutlinedButton(onClick = {
+                    run {
+                        approvedClear = cloud.previewClear(accountId)
+                        if (approvedClear == null) cloudSummary = "No cloud backup to clear."
+                    }
+                }, enabled = !busy && approvedClear == null && exportAccount == null && newRecovery == null) {
+                    Text("Review clearing cloud backup")
+                }
+            }
             if (status == "active") {
                 OutlinedButton(onClick = {
                     run { approvedBackup = cloud.previewFirst(account.getString("account")) }
@@ -515,6 +558,23 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         },
         dismissButton = { TextButton(onClick = { confirmRecovery = false }) { Text("Cancel") } }
     )
+    approvedClear?.let { approved ->
+        AlertDialog(onDismissRequest = { if (!busy) approvedClear = null },
+            title = { Text("Clear saved cloud backup?") },
+            text = { Text("Remove the saved cloud metadata at revision ${approved.revision}: ${approved.favorites} favorites, ${approved.playlists} playlists and saved settings. This does not erase local music, downloads or your membership. Automatic backup on this device will be turned off if it owns the local library. You can export a copy first.") },
+            confirmButton = { TextButton(onClick = {
+                approvedClear = null
+                run {
+                    if (GuardianLocalLibraryOwner.status(context, approved.account) == LocalLibraryBinding.Status.MATCH) {
+                        GuardianV2Runtime.disableAutomaticSync(context.applicationContext)
+                    }
+                    val revision = cloud.confirmClear(approved, confirmed = true)
+                    cloudSummary = "Cloud backup cleared at revision $revision."
+                    notice = "Cloud backup cleared. Local music unchanged."
+                }
+            }, enabled = !busy) { Text("Clear cloud backup", color = MaterialTheme.colorScheme.error) } },
+            dismissButton = { TextButton(onClick = { approvedClear = null }, enabled = !busy) { Text("Cancel") } })
+    }
     approvedUpdate?.let { approved ->
         AlertDialog(onDismissRequest = { if (!busy) approvedUpdate = null },
             title = { Text("Update saved library?") },
