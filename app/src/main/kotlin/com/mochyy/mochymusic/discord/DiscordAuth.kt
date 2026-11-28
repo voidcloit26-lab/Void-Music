@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.mochyy.mochymusic.BuildConfig
+import com.mochyy.mochymusic.guardian.GuardianGate
 import com.mochyy.mochymusic.constants.DiscordAccessTokenKey
 import com.mochyy.mochymusic.constants.DiscordLoginStateKey
 import com.mochyy.mochymusic.constants.DiscordLoginVerifierKey
@@ -26,7 +27,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -65,7 +68,17 @@ class DiscordAuth @Inject constructor(
     val profileLinkConfigured: Boolean get() =
         BuildConfig.VOID_NATIVE_RPC_INCLUDED && ClientId == BuildConfig.VOID_DISCORD_APPLICATION_ID
 
-    suspend fun loginUri(): Uri = synchronized(lock) {
+    init {
+        scope.launch {
+            GuardianGate.changes.collect {
+                if (!runCatching { GuardianGate.isAllowed(context) }.getOrDefault(false)) clearProfile()
+            }
+        }
+    }
+
+    suspend fun loginUri(): Uri = withContext(Dispatchers.IO) {
+        check(GuardianGate.isAllowed(context)) { "Guardian access required" }
+        synchronized(lock) {
         check(profileLinkConfigured) { "Discord profile linking is unavailable" }
         check(_login.value != DiscordLogin.Finishing) { "Discord profile lookup is in progress" }
         val transaction = Pending(Pkce.randomCode(24), Pkce.randomCode(64), SystemClock.elapsedRealtime())
@@ -81,6 +94,7 @@ class DiscordAuth @Inject constructor(
             .appendQueryParameter("code_challenge", Pkce.challengeOf(transaction.verifier))
             .appendQueryParameter("code_challenge_method", "S256")
             .build()
+        }
     }
 
     fun isCallback(redirect: Uri): Boolean =
@@ -123,6 +137,7 @@ class DiscordAuth @Inject constructor(
             check(body["token_type"]?.jsonPrimitive?.contentOrNull.equals("Bearer", ignoreCase = true))
             check(body["scope"]?.jsonPrimitive?.contentOrNull?.split(' ')?.filter { it.isNotBlank() }?.toSet() == setOf("identify"))
             val loaded = DiscordProfile.fetch(token)
+            check(GuardianGate.isAllowed(context)) { "Guardian access required" }
             synchronized(lock) {
                 if (generation == attempt) {
                     _profile.value = loaded
@@ -164,13 +179,15 @@ class DiscordAuth @Inject constructor(
     suspend fun renew(rejected: String): String? = null
     suspend fun refreshProfile() = Unit
 
+    private fun clearProfile() = synchronized(lock) {
+        generation++
+        pending = null
+        _profile.value = null
+        _login.value = DiscordLogin.Idle
+    }
+
     suspend fun logOut() {
-        synchronized(lock) {
-            generation++
-            pending = null
-            _profile.value = null
-            _login.value = DiscordLogin.Idle
-        }
+        clearProfile()
         forgetOldLogin()
     }
 
