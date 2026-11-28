@@ -45,8 +45,8 @@ sealed interface DiscordLogin {
 }
 
 /** Optional, identify-only profile lookup. Never authenticates the RPC client or
- * grants Guardian access. The profile, OAuth transaction and tokens are not
- * persisted; a process restart requires fresh consent to show the profile. */
+ * grants Guardian access. Only display metadata is persisted for an authorized
+ * V2 account; OAuth transactions and tokens are never persisted. */
 @Singleton
 class DiscordAuth @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -54,7 +54,9 @@ class DiscordAuth @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
     private val json = Json { ignoreUnknownKeys = true }
-    private data class Pending(val state: String, val verifier: String, val started: Long)
+    private val profileCache = DiscordProfileCache(context)
+    private var displayOwner: String? = null
+    private data class Pending(val state: String, val verifier: String, val started: Long, val owner: String?)
     private var pending: Pending? = null
     private var generation = 0L
     private val _login = MutableStateFlow<DiscordLogin>(DiscordLogin.Idle)
@@ -71,7 +73,20 @@ class DiscordAuth @Inject constructor(
     init {
         scope.launch {
             GuardianGate.changes.collect {
-                if (!runCatching { GuardianGate.isAllowed(context) }.getOrDefault(false)) clearProfile()
+                synchronized(lock) {
+                    if (!runCatching { GuardianGate.isAllowed(context) }.getOrDefault(false)) {
+                        clearProfile()
+                    } else if (GuardianGate.v2Enforced) {
+                        val owner = GuardianGate.authorizedAccount(context)
+                        if (owner == null) {
+                            clearProfile()
+                        } else if (displayOwner != owner) {
+                            clearProfile()
+                            displayOwner = owner
+                            _profile.value = profileCache.read(owner)
+                        }
+                    }
+                }
             }
         }
     }
@@ -81,7 +96,14 @@ class DiscordAuth @Inject constructor(
         synchronized(lock) {
         check(profileLinkConfigured) { "Discord profile linking is unavailable" }
         check(_login.value != DiscordLogin.Finishing) { "Discord profile lookup is in progress" }
-        val transaction = Pending(Pkce.randomCode(24), Pkce.randomCode(64), SystemClock.elapsedRealtime())
+        val owner = GuardianGate.authorizedAccount(context)
+        check(!GuardianGate.v2Enforced || owner != null) { "Guardian account required" }
+        if (GuardianGate.v2Enforced && displayOwner != owner) {
+            clearProfile()
+            displayOwner = owner
+            _profile.value = owner?.let(profileCache::read)
+        }
+        val transaction = Pending(Pkce.randomCode(24), Pkce.randomCode(64), SystemClock.elapsedRealtime(), owner)
         pending = transaction
         generation++
         _login.value = DiscordLogin.InBrowser
@@ -139,10 +161,16 @@ class DiscordAuth @Inject constructor(
             val loaded = DiscordProfile.fetch(token)
             check(GuardianGate.isAllowed(context)) { "Guardian access required" }
             synchronized(lock) {
-                if (generation == attempt) {
+                if (generation == attempt &&
+                    (!GuardianGate.v2Enforced || (transaction.owner != null &&
+                        transaction.owner == GuardianGate.authorizedAccount(context)))) {
+                    if (transaction.owner != null) {
+                        profileCache.write(transaction.owner, loaded)
+                        displayOwner = transaction.owner
+                    }
                     _profile.value = loaded
                     _login.value = DiscordLogin.Idle
-                }
+                } else if (generation == attempt) clearProfile()
             }
         } catch (e: CancellationException) {
             throw e
@@ -183,11 +211,17 @@ class DiscordAuth @Inject constructor(
         generation++
         pending = null
         _profile.value = null
+        displayOwner = null
         _login.value = DiscordLogin.Idle
     }
 
-    suspend fun logOut() {
-        clearProfile()
+    suspend fun logOut() = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            val owner = GuardianGate.authorizedAccount(context)
+            if (owner != null) profileCache.clear(owner)
+            clearProfile()
+            displayOwner = owner
+        }
         forgetOldLogin()
     }
 
