@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 
 /** Two membership actions. Purchases are support referrals, not payments. */
 @Composable
-internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: (() -> Unit)? = null, redeem: (String) -> Unit) {
+internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: (() -> Unit)? = null, onManageData: (() -> Unit)? = null, redeem: (String) -> Unit) {
     var page by remember { mutableStateOf("expired") }
     var code by remember { mutableStateOf("") }
     var linkError by remember { mutableStateOf("") }
@@ -45,6 +45,11 @@ internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: 
                 }
                 OutlinedButton(onClick = { page = "buy" }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                     Text("Contact owner")
+                }
+                if (onManageData != null) {
+                    TextButton(onClick = onManageData, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                        Text("Manage saved cloud data")
+                    }
                 }
             }
             "key" -> {
