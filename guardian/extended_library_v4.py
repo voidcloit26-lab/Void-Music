@@ -84,7 +84,7 @@ class ExtendedLibraryStore:
             revision = row[0] if row else 0
             if expected != revision:
                 raise RevisionConflict("review extended library before saving")
-            if row and row[1] == payload:
+            if not clearing and row and row[1] == payload:
                 return revision
             db.execute("""INSERT INTO extended_library_v4 (account,revision,payload,updated_at)
                 VALUES (?,?,?,?) ON CONFLICT(account) DO UPDATE SET revision=excluded.revision,
