@@ -46,7 +46,11 @@ object AppModule {
         @ApplicationContext context: Context,
     ): InternalDatabase = Room
         // on a tv each profile has its own library; everywhere else this is the one database
-        .databaseBuilder(context, InternalDatabase::class.java, com.mochyy.mochymusic.link.tv.TvProfiles.databaseName(context))
+        .databaseBuilder(context, InternalDatabase::class.java,
+            // The protected phone library has one verified owner. Never let legacy
+            // TV profile preferences select an unrelated database for that owner.
+            if (com.mochyy.mochymusic.BuildConfig.VOID_GUARDIAN_V2_ENFORCED) InternalDatabase.DB_NAME
+            else com.mochyy.mochymusic.link.tv.TvProfiles.databaseName(context))
         // The one list in MusicDatabase.kt. This copy used to be its own, stopped at 35 -> 36, and
         // every later version reached the phone as "no migration path" -> all tables dropped.
         .addMigrations(*com.mochyy.mochymusic.db.AllMigrations)
