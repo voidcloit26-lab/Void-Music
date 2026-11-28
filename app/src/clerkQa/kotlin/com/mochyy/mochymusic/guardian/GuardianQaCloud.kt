@@ -214,6 +214,18 @@ internal class GuardianQaCloud(
         requireAccount(account, active = true)
         val remote = client.request("cloud_read", emptyMap())
         val revision = remote.getLong("revision")
+        if (revision == 0L && remote.isNull("library")) {
+            // This entry point is called only after the user explicitly enables sync.
+            val initial = GuardianCloudSnapshot.capture(database)
+            check(initial.excludedEntries == 0 && isCurrent() && ownsLibrary(account)) {
+                "Review unsupported local entries before first synchronization"
+            }
+            val digest = CloudMetadata.parse(initial.body).digest()
+            check(GuardianCloudSnapshot.capture(database) == initial && isCurrent() && ownsLibrary(account))
+            val reply = client.request("cloud_write", mapOf("revision" to 0L, "library" to initial.body))
+            check(reply.getLong("revision") == 1L && isCurrent() && ownsLibrary(account))
+            return CloudSyncPolicy.Baseline(account, 1L, digest)
+        }
         require(revision in 1 until Long.MAX_VALUE && !remote.isNull("library")) { "Review a manual backup first" }
         val body = remoteBody(remote)
         val digest = CloudMetadata.parse(body).digest()
