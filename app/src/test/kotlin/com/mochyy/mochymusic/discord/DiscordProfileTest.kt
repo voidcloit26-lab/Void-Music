@@ -45,4 +45,14 @@ class DiscordProfileTest {
         assertNull(profile.bannerUrl)
         assertNull(profile.bannerColor)
     }
+    @Test fun cachedProfileRejectsUnrelatedAccountAssetsAndExtraData() {
+        val profile = DiscordProfile.parseCurrentUser(
+            """{"id":"$id","username":"testuser","avatar":"$avatar","banner":"$banner"}"""
+        )
+        assertTrue(DiscordProfileCache.valid(profile))
+        assertFalse(DiscordProfileCache.valid(profile.copy(avatarUrl = "https://example.org/avatar.png")))
+        assertFalse(DiscordProfileCache.valid(profile.copy(id = "123456789012345678")))
+        assertFalse(DiscordProfileCache.valid(profile.copy(bio = "private")))
+        assertFalse(DiscordProfileCache.valid(profile.copy(bannerColor = -1)))
+    }
 }
