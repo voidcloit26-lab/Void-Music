@@ -13,6 +13,7 @@ from guardian.clerk_profile import ProfileUnavailable
 from guardian.cloud_store import RevisionConflict
 from guardian.membership_rules import MembershipDenied
 from guardian.version_gate import UpdateRequired
+from guardian.stage_release_registry import ReleaseUnavailable
 
 ROUTES = {
     "/v2/challenge": {"public_key","action","body"},
@@ -85,6 +86,8 @@ class AccountAPI:
                 raise ValueError("invalid body")
             method=self.protocol.challenge if path=="/v2/challenge" else self.protocol.execute
             result=method(auth[7:],**data)
+        except ReleaseUnavailable:
+            return reply("503 Service Unavailable",{"error":"release_policy_unavailable"})
         except ProfileUnavailable:
             return reply("503 Service Unavailable",{"error":"identity_verification_unavailable"})
         except SessionDenied:
