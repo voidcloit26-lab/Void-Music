@@ -16,7 +16,7 @@ import org.json.JSONObject
 
 /** Disconnected QA screen: no playback grant, no production payments. */
 @Composable
-internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, business: GuardianBusinessQaClient, gateEntry: Boolean, onSignOut: suspend () -> Unit) {
+internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: GuardianQaLease, cloud: GuardianQaCloud, business: GuardianBusinessQaClient, gateEntry: Boolean, initialCode: String = "", onSignOut: suspend () -> Unit) {
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
     var recognizedOwner by remember(client) { mutableStateOf(false) }
@@ -36,7 +36,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var linkRequired by remember(client) { mutableStateOf(false) }
     var confirmLibraryAccount by remember(client) { mutableStateOf<String?>(null) }
     var recovery by remember(client) { mutableStateOf("") }
-    var key by remember(client) { mutableStateOf("") }
+    var key by remember(client) { mutableStateOf(initialCode.takeIf { Regex("[A-Za-z0-9_-]{43}").matches(it) } ?: "") }
     var error by remember(client) { mutableStateOf("") }
     var busy by remember(client) { mutableStateOf(false) }
     var newRecovery by remember(client) { mutableStateOf<String?>(null) }
