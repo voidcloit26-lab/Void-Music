@@ -53,6 +53,7 @@ ACTIONS = {
     "extended_read": set(),
     "extended_write": {"revision", "library"},
     "extended_clear": {"revision"},
+    "extended_history_clear": {"revision"},
     "release_policy": set(),
     "release_download": {"sequence"},
 }
@@ -308,6 +309,8 @@ class AccountProtocol:
                 return {"revision": self.extended_library.write(account, fingerprint, body["revision"], body["library"])}
             if action == "extended_clear":
                 return {"revision": self.extended_library.clear(account, fingerprint, body["revision"])}
+            if action == "extended_history_clear":
+                return {"revision": self.extended_library.clear_history(account, fingerprint, body["revision"])}
         if action == "cloud_read":
             revision, library = self.store.read_library(account, fingerprint)
             return {"revision": revision, "library": library}
