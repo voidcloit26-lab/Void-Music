@@ -40,6 +40,11 @@ internal object GuardianV2Runtime {
         runCatching { current(b) && GuardianLocalLibraryOwner.status(context, b.account) == LocalLibraryBinding.Status.MATCH && cache(context).active(b.account) }.getOrDefault(false)
     }
 
+    /** Returns an internal account ID only for the current authorized session. */
+    fun authorizedAccount(context: Context): String? = synchronized(stateLock) {
+        if (allowed(context)) binding?.account else null
+    }
+
     private fun revokeLocked(context: Context) {
         generation++
         binding = null
