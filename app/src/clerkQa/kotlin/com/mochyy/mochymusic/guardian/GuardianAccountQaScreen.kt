@@ -27,6 +27,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var attemptedAutoEntry by remember(client) { mutableStateOf<JSONObject?>(null) }
     var showClaim by remember(client) { mutableStateOf(false) }
     var notice by remember(client) { mutableStateOf("") }
+    var profile by remember(client) { mutableStateOf<JSONObject?>(null) }
     var showContact by remember(client) { mutableStateOf(false) }
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
@@ -193,6 +194,17 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         }
     }
 
+    LaunchedEffect(result, gateEntry) {
+        val current = result
+        profile = null
+        if (!gateEntry && current != null) {
+            try {
+                val loaded = client.request("profile", emptyMap())
+                if (loaded.getString("account") == current.getString("account") && result === current) profile = loaded
+            } catch (e: CancellationException) { throw e } catch (_: Exception) { /* Optional profile must not block playback. */ }
+        }
+    }
+
     val pendingRelease = updateState
     val linkedAccount = result?.optString("account")
     if (pendingRelease != null && linkedAccount != null &&
@@ -234,6 +246,10 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         val account = result
         if (account != null) {
             Text("VOID Premium", style = MaterialTheme.typography.headlineSmall)
+            profile?.let { info ->
+                Text(info.getString("email"), style = MaterialTheme.typography.bodyMedium)
+                Text("Premium claims: ${info.getInt("total_claims")} · Renewals: ${info.getInt("renewals")}", style = MaterialTheme.typography.bodySmall)
+            }
             val status = account.optString("status", "unknown")
             val accountId = account.getString("account")
             val libraryOwner = GuardianLocalLibraryOwner.status(context, accountId)
