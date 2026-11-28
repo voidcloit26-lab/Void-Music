@@ -42,6 +42,11 @@ class VersionedLeaseProtocolTests(unittest.TestCase):
     def test_supported_lease(self):
         response = self.f.call("lease_versioned",{"version_code":75,"signer_sha256":"b"*64})
         self.assertEqual(set(response),{"payload","signature"})
+        from guardian.device_protocol import unb64
+        lease = json.loads(unb64(response["payload"]))
+        policy = self.api.version_gate.require_supported(75,"b"*64)
+        self.assertLessEqual(lease["expires_at"], policy.expires_at)
+        self.assertGreater(lease["expires_at"],lease["issued_at"])
 
     def test_disabled_gate_keeps_current_compatibility(self):
         self.api.version_gate = None
