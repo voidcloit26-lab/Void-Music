@@ -25,6 +25,8 @@ from guardian.cloud_store import CloudStore
 from guardian.durable_challenges import DurableChallenges, ChallengeDenied
 from guardian.clerk_profile import verified_primary_email
 from guardian.version_gate import UpdateRequired
+from guardian.release_policy import verify_policy
+from guardian.release_download import DownloadUnavailable
 
 
 class LinkedCloudStore(ExternalIdentityStore, CloudStore):
@@ -48,6 +50,7 @@ ACTIONS = {
     "backup_for_upgrade": {"revision", "library"},
     "cloud_clear": {"revision"},
     "release_policy": set(),
+    "release_download": {"sequence"},
 }
 MAX_BODY = 600 * 1024
 
@@ -55,6 +58,8 @@ MAX_BODY = 600 * 1024
 def canonical_body(action, body):
     if action not in ACTIONS or not isinstance(body, dict) or set(body) != ACTIONS[action]:
         raise ValueError("invalid action body")
+    if action == "release_download" and (type(body["sequence"]) is not int or not 1 <= body["sequence"] <= 2**63-1):
+        raise ValueError("invalid release sequence")
     if action == "lease_versioned":
         import re
         if type(body["version_code"]) is not int or not 1 <= body["version_code"] <= 2100000000:
@@ -80,7 +85,7 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None, require_activation=False, version_gate=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None, require_activation=False, version_gate=None, download_tickets=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
@@ -89,6 +94,7 @@ class AccountProtocol:
         self.owner_bootstrap = owner_bootstrap
         self.release_registry = release_registry
         self.version_gate = version_gate
+        self.download_tickets = download_tickets
         self.require_activation = require_activation is True
         self.max_pending = max_pending
         self.pending = {}
@@ -104,6 +110,8 @@ class AccountProtocol:
             raise MembershipDenied("versioned leases disabled")
         if self.require_activation and action in ("register", "redeem_free"):
             raise MembershipDenied("legacy activation disabled")
+        if action == "release_download" and (self.download_tickets is None or self.release_registry is None):
+            raise MembershipDenied("release download disabled")
         if action == "release_policy" and self.release_registry is None:
             raise MembershipDenied("release checks disabled")
         # Except for registration and recovery, only the current linked device may allocate challenges.
@@ -206,6 +214,18 @@ class AccountProtocol:
         # Resolve again after proof; store operations recheck registered device
         # in their own transaction, so a concurrent recovery cannot reuse it.
         account = self.store.resolve(session.issuer, session.subject, fingerprint)
+        if action == "release_download":
+            if self.download_tickets is None or self.release_registry is None:
+                raise MembershipDenied("release download disabled")
+            release = self.release_registry.current()
+            if release is None:
+                raise DownloadUnavailable("release unavailable")
+            policy = verify_policy(*release, self.release_registry.public_key, int(self.release_registry.clock()))
+            if body["sequence"] != policy.sequence:
+                from guardian.cloud_store import RevisionConflict
+                raise RevisionConflict("release changed")
+            ticket = self.download_tickets.issue(session, account, fingerprint, policy.sequence)
+            return {"ticket": ticket, "expires_in": 120}
         if action == "release_policy":
             if self.release_registry is None:
                 raise MembershipDenied("release checks disabled")
