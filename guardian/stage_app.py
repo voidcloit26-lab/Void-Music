@@ -18,6 +18,7 @@ from guardian.stage_release_registry import StageReleaseRegistry
 from guardian.version_gate import VersionGate
 from guardian.release_download import DownloadTickets, ReleaseFiles, ReleaseDownloadAPI
 from guardian.release_policy import verify_policy
+from guardian.release_asset_store import PrivateReleaseAssets
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
@@ -70,7 +71,13 @@ def create_app():
             initial_release = registry.current()
             if initial_release is None:
                 raise ValueError('verified initial release required')
-            files = ReleaseFiles(os.environ['VOID_V2_RELEASE_DIRECTORY'])
+            storage = os.environ.get('VOID_V2_RELEASE_STORAGE', 'local')
+            if storage == 'private-github':
+                files = PrivateReleaseAssets(os.environ['VOID_V2_RELEASE_READ_TOKEN'])
+            elif storage == 'local':
+                files = ReleaseFiles(os.environ['VOID_V2_RELEASE_DIRECTORY'])
+            else:
+                raise ValueError('unsupported release storage')
             with files.open_verified(verify_policy(*initial_release, registry.public_key, int(registry.clock()))):
                 pass
             tickets = DownloadTickets(store)
