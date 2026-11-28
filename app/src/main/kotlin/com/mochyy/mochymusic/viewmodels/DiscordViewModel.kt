@@ -36,7 +36,7 @@ class DiscordViewModel @Inject constructor(
     private val presence: DiscordPresence,
 ) : ViewModel() {
 
-    val isConfigured: Boolean get() = auth.isConfigured
+    val isConfigured: Boolean get() = auth.profileLinkConfigured
     val login: StateFlow<DiscordLogin> = auth.login
     val connection: StateFlow<PresenceConnection> = presence.connection
     val nowPlaying: StateFlow<NowPlaying?> = presence.nowPlaying
