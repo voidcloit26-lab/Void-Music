@@ -271,7 +271,12 @@ class AccountProtocol:
                 rows = db.execute(
                     "SELECT kind, COUNT(*) FROM activation_codes_v2 WHERE redeemed_account=? AND redeemed_at IS NOT NULL GROUP BY kind",
                     (account,)).fetchall()
+                collective_rows = db.execute(
+                    "SELECT c.kind, COUNT(*) FROM collective_redemptions_v3 r JOIN collective_codes_v3 c ON c.digest=r.digest WHERE r.account=? GROUP BY c.kind",
+                    (account,)).fetchall() if self.activation_codes.collective else []
             counts = {kind: int(count) for kind, count in rows}
+            for kind, count in collective_rows:
+                counts[kind] = counts.get(kind, 0) + int(count)
             return {"account": account, "email": email, "total_claims": sum(counts.values()),
                     "renewals": counts.get("renewal", 0)}
         if action == "status":
