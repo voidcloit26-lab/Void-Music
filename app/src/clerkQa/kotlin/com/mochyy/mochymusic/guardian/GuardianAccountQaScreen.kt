@@ -518,7 +518,18 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     approvedUpdate?.let { approved ->
         AlertDialog(onDismissRequest = { if (!busy) approvedUpdate = null },
             title = { Text("Update saved library?") },
-            text = { Text("Upload additions to backup revision ${approved.revision}. Existing remote metadata must be preserved. Confirm only if this entire local library belongs to your signed-in account.") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val changes = approved.changes
+                    Text("Replace cloud backup revision ${approved.revision} with your current eligible local library.")
+                    Text("Favorites: +${changes.addedFavorites}, −${changes.removedFavorites}")
+                    Text("Playlists: +${changes.addedPlaylists}, −${changes.removedPlaylists}, ${changes.changedPlaylists} edited")
+                    if (changes.removesOrChanges) {
+                        Text("Warning: removed favorites and playlists will no longer be in the cloud backup. Edited playlists replace their saved versions.", color = MaterialTheme.colorScheme.error)
+                    }
+                    Text("No local music or audio files are deleted. Confirm only if this library belongs to your account.")
+                }
+            },
             confirmButton = { TextButton(onClick = {
                 approvedUpdate = null
                     approvedPreferences = null
