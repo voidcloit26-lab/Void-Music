@@ -8,6 +8,7 @@ import com.mochyy.mochymusic.constants.RememberShuffleAndRepeatKey
 import com.mochyy.mochymusic.utils.dataStore
 import kotlinx.coroutines.flow.first
 import com.mochyy.mochymusic.db.MusicDatabase
+import com.mochyy.mochymusic.models.toMediaMetadata
 import org.json.JSONObject
 import org.json.JSONArray
 
@@ -97,6 +98,35 @@ internal class GuardianQaCloud(
         val plan = GuardianCloudRestore.preview(database, library)
         check(isCurrent())
         return RestorePreview(account, revision, library, plan)
+    }
+
+    /** Called only after explicit account/library restore consent. Resolve only
+     * the exact song identifiers in the authenticated cloud snapshot. */
+    suspend fun restoreAccountLibrary(account: String): RestorePreview? {
+        requireAccount(account, active = true)
+        val original = previewRestore(account) ?: return null
+        check(original.plan.conflictingPlaylists.isEmpty()) { "Review conflicting playlists before restore" }
+        val missing = original.plan.missingTracks
+        for (batch in missing.chunked(25)) {
+            check(isCurrent() && ownsLibrary(account))
+            val songs = com.music.innertube.YouTube.queue(batch).getOrThrow()
+            val expected = batch.toSet()
+            val resolved = songs.filter { it.id in expected }.distinctBy { it.id }
+            database.withTransaction {
+                check(isCurrent() && ownsLibrary(account))
+                resolved.forEach { song ->
+                    if (getSongByIdBlocking(song.id) == null) insert(song.toMediaMetadata())
+                }
+                check(isCurrent() && ownsLibrary(account))
+            }
+        }
+        val current = requireNotNull(previewRestore(account))
+        check(current.revision == original.revision && current.library == original.library) {
+            "Cloud library changed; review again"
+        }
+        check(current.plan.ready) { "Some songs are unavailable or conflict with local files" }
+        confirmRestore(current, confirmed = true)
+        return current
     }
 
     suspend fun confirmRestore(approved: RestorePreview, confirmed: Boolean) {
