@@ -227,6 +227,12 @@ interface DatabaseDao {
     @Query("SELECT COUNT(1) FROM song WHERE liked")
     fun likedSongsCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM playlist WHERE bookmarkedAt IS NOT NULL AND browseId IS NULL AND isEditable=1 AND id NOT IN ('LP_LIKED','LP_DOWNLOADED')")
+    fun accountLocalPlaylistCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM song WHERE isDownloaded=1")
+    fun accountLocalDownloadCount(): Flow<Int>
+
     @Transaction
     @Query("SELECT song.* FROM song JOIN song_album_map ON song.id = song_album_map.songId WHERE song_album_map.albumId = :albumId ORDER BY song_album_map.`index`, song_album_map.rowid")
     fun albumSongs(albumId: String): Flow<List<Song>>
