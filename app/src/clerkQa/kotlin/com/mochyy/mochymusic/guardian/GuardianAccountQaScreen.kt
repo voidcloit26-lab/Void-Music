@@ -403,7 +403,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     approvedRestore = preview?.takeIf { status == "active" && it.plan.ready }
                     cloudSummary = if (preview == null) "No cloud backup yet" else
                         "Restore preview: ${preview.plan.addFavorites.size} favorites, " +
-                        "${preview.plan.addPlaylists.size} playlists, " +
+                        "${preview.plan.addPlaylists.size} new playlists, ${preview.plan.appendTracks.sumOf { it.tracks.size }} tracks to append, " +
                         "${preview.plan.missingTracks.size} missing tracks, " +
                         "${preview.plan.conflictingPlaylists.size} conflicts. No changes made."
                 }
@@ -543,7 +543,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     approvedRestore?.let { approved ->
         AlertDialog(onDismissRequest = { if (!busy) approvedRestore = null },
             title = { Text("Restore saved library?") },
-            text = { Text("Add ${approved.plan.addFavorites.size} favorites and ${approved.plan.addPlaylists.size} playlists from this account. Existing items will not be removed or overwritten. Continue only if this local library belongs to you.") },
+            text = { Text("Add ${approved.plan.addFavorites.size} favorites and ${approved.plan.addPlaylists.size} new playlists and append ${approved.plan.appendTracks.sumOf { it.tracks.size }} tracks to existing playlists from this account. Existing items will not be removed or overwritten. Continue only if this local library belongs to you.") },
             confirmButton = { TextButton(onClick = {
                 approvedRestore = null
                 run {
