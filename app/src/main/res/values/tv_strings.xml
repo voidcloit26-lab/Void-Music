@@ -168,4 +168,6 @@
     <string name="tv_pair_sheet_by_address">Link by address</string>
     <string name="tv_pair_sheet_address_detail">Type the address your TV shows under its code, then the code</string>
     <string name="tv_pair_address_hint">192.168.1.20</string>
+    <!-- Default fallbacks for existing localized resources. -->
+    <string name="tv_source">Source</string>
 </resources>
