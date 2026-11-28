@@ -1261,9 +1261,13 @@ interface DatabaseDao {
         }
     }
 
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_song_map WHERE playlistId = :playlistId")
+    fun nextPlaylistPosition(playlistId: String): Int
+
     @Transaction
     fun addSongToPlaylist(playlist: Playlist, songIds: List<String>) {
-        var position = playlist.songCount
+        // Use the committed position, not a possibly stale UI song count.
+        var position = nextPlaylistPosition(playlist.id)
         songIds.forEach { id ->
             insert(
                 PlaylistSongMap(
@@ -1738,6 +1742,13 @@ interface DatabaseDao {
 
     @Update
     fun update(song: SongEntity)
+
+    @Transaction
+    fun toggleLikeLocally(songId: String): SongEntity? {
+        // Read and write under one Room transaction; rapid taps use current state.
+        val current = getSongByIdBlocking(songId)?.song ?: return null
+        return current.toggleLike().also { update(it) }
+    }
 
     @Query("UPDATE song SET lyricsOffset = :offsetMs WHERE id = :songId")
     fun updateLyricsOffset(songId: String, offsetMs: Int)
