@@ -16,7 +16,7 @@ internal class GuardianBusinessQaClient(
 ) {
     private val lock = Mutex()
     private val origin = "https://void-guardian-v2-business-stage.onrender.com"
-    private val allowed = setOf("summary","member","price","state","audit","codes/create","codes/list","codes/cancel")
+    private val allowed = setOf("summary","member","price","state","audit","codes/create","codes/list","codes/cancel","codes/history")
     private suspend fun checked() = ClerkQaBridge.currentSession().also {
         check(it.subject == expectedSubject && it.sessionId == expectedSession)
         require(it.token.length in 1..8192 && Regex("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+").matches(it.token))
