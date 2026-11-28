@@ -38,31 +38,31 @@ internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: 
         if (error.isNotEmpty()) GuardianAccountNotice(error)
         when (page) {
             "expired" -> {
-                Text("Your membership has ended", style = MaterialTheme.typography.headlineMedium)
+                Text("Your premium has expired", style = MaterialTheme.typography.headlineMedium)
                 Text("Your account, favorites and playlists are preserved. Renew to restore access.")
                 Button(onClick = { page = "key" }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                    Text("Enter renewal key")
+                    Text("Reactivate premium")
                 }
                 OutlinedButton(onClick = { page = "buy" }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                    Text("Buy membership")
+                    Text("Contact owner")
                 }
             }
             "key" -> {
                 Text("Renew your membership", style = MaterialTheme.typography.headlineMedium)
                 Text("Enter the renewal key issued for your membership.")
                 OutlinedTextField(code, { code = it.trim().take(43) }, singleLine = true,
-                    label = { Text("Renewal key") }, visualTransformation = PasswordVisualTransformation(),
+                    label = { Text("Renewal code") }, visualTransformation = PasswordVisualTransformation(),
                     enabled = !busy, modifier = Modifier.fillMaxWidth())
                 Button(onClick = { val entered = code; code = ""; redeem(entered) },
                     enabled = !busy && Regex("[A-Za-z0-9_-]{43}").matches(code),
-                    modifier = Modifier.fillMaxWidth()) { Text("Redeem renewal key") }
+                    modifier = Modifier.fillMaxWidth()) { Text("Claim renewal code") }
                 TextButton(onClick = { code = ""; page = "expired" }, enabled = !busy) { Text("Back") }
             }
             "buy" -> {
-                Text("Buy membership", style = MaterialTheme.typography.headlineMedium)
+                Text("Contact owner", style = MaterialTheme.typography.headlineMedium)
                 Text("Choose how you want to contact VOID for a renewal key. No payment is collected in this app.")
                 Button(onClick = { open("https://discord.com/users/1472442073108971575") }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Contact owner directly")
+                    Text("Contact on Discord")
                 }
                 OutlinedButton(onClick = { open("https://discord.gg/marscm") }, modifier = Modifier.fillMaxWidth()) {
                     Text("Join MARS Community")
@@ -75,7 +75,7 @@ internal fun GuardianExpiredMembership(busy: Boolean, error: String, onSignOut: 
             }
         }
         if (onSignOut != null && page == "expired") {
-            Text("Use your device’s Back action to switch accounts.", style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { switchAccount = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Sign out / switch account") }
         }
     }
     if (switchAccount && onSignOut != null) {
