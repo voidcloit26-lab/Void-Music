@@ -136,13 +136,11 @@ class ReleaseDownloadAPI:
             # repeatedly hash or stream the file. A failed download needs a new ticket.
             self.tickets.consume(session,ticket,sequence)
             file = self.files.open_verified(policy)
+            body = _DownloadBody(file)
             start("200 OK",[("Content-Type","application/vnd.android.package-archive"),
                  ("Content-Length",str(policy.apk_bytes)),("Cache-Control","private, no-store"),
                  ("X-Content-Type-Options","nosniff"),("Content-Disposition","attachment; filename=VOID-Music.apk")])
-            wrapper = env.get("wsgi.file_wrapper")
-            if wrapper:
-                return wrapper(file,64*1024)
-            return _DownloadBody(file)
+            return body
         except SessionDenied:
             status,value="401 Unauthorized",{"error":"invalid_session"}
         except MembershipDenied:
