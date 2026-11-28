@@ -35,10 +35,10 @@ class Lease:
         return json.dumps(asdict(self),sort_keys=True,separators=(',',':'),ensure_ascii=True).encode('ascii')
 
 
-def issue(member, account, device, now, key):
+def issue(member, account, device, now, key, *, max_seconds=MAX_SECONDS):
     if not isinstance(key, ec.EllipticCurvePrivateKey) or not isinstance(key.curve, ec.SECP256R1):
         raise ValueError('P-256 signing key required')
-    lease = Lease(account,device,now,member.lease_until(now),member.expires_at).validate()
+    lease = Lease(account,device,now,member.lease_until(now, max_seconds=max_seconds),member.expires_at).validate()
     payload = lease.canonical()
     return payload,key.sign(payload,ec.ECDSA(hashes.SHA256()))
 
