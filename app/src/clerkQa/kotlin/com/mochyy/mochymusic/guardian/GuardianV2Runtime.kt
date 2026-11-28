@@ -80,7 +80,7 @@ internal object GuardianV2Runtime {
                     }
                     val lease=cache(context)
                     val anchor=lease.anchor()
-                    val reply=client.request("lease",emptyMap())
+                    val reply=GuardianStableUpdate.lease(context,client)
                     val payload=decode(reply.getString("payload"),4096)
                     val sig=decode(reply.getString("signature"),128)
                     val epoch=JSONObject(String(payload,Charsets.US_ASCII)).getLong("issued_at")
@@ -97,7 +97,7 @@ internal object GuardianV2Runtime {
                     saved
                 } catch(e:CancellationException){throw e}
                 catch(e:GuardianAccountClient.RequestFailed){
-                    if(e.status==401 || e.status==403) clear(context)
+                    if(e.status in listOf(401,403,426)) clear(context)
                     false
                 } catch(_:Exception){false}
             }
