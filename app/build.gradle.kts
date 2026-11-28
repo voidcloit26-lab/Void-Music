@@ -218,8 +218,8 @@ extensions.configure<ApplicationExtension> {
         buildConfigField("Boolean", "VOID_GUARDIAN_ENFORCED", guardianEnforced.toString())
         buildConfigField("String", "VOID_GUARDIAN_ORIGIN", "\"$guardianOrigin\"")
         buildConfigField("String", "VOID_GUARDIAN_PUBLIC_KEY", "\"$guardianPublicKey\"")
-        val discordClientId = localProperties.getProperty("DISCORD_CLIENT_ID")
-            ?: System.getenv("DISCORD_CLIENT_ID") ?: ""
+        // Profile linking uses the same public application identifier as native presence.
+        val discordClientId = "1553388915300245594"
         buildConfigField("String", "DISCORD_CLIENT_ID", "\"$discordClientId\"")
         manifestPlaceholders["discordRedirectScheme"] =
             if (discordClientId.isNotBlank()) "discord-$discordClientId" else "mochy-discord-unset"
