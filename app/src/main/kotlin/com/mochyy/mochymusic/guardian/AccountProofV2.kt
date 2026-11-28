@@ -13,7 +13,8 @@ internal object AccountProofV2 {
         "status" to emptySet(), "redeem_free" to setOf("code"),
         "cloud_read" to emptySet(), "cloud_write" to setOf("revision", "library"),
         "cloud_clear" to setOf("revision"), "release_policy" to emptySet(),
-        "backup_for_upgrade" to setOf("revision", "library")
+        "backup_for_upgrade" to setOf("revision", "library"),
+        "release_download" to setOf("sequence")
     )
     private fun quote(value: String): String = buildString {
         append('"')
@@ -59,6 +60,11 @@ internal object AccountProofV2 {
             require(version is Int || version is Long)
             require((version as Number).toLong() in 1L..2100000000L)
             require((body["signer_sha256"] as? String)?.matches(Regex("[a-f0-9]{64}")) == true)
+        }
+        if (action == "release_download") {
+            val sequence = body["sequence"]
+            require(sequence is Int || sequence is Long)
+            require((sequence as Number).toLong() > 0L)
         }
         if ("revision" in body) {
             val revision = body["revision"]
