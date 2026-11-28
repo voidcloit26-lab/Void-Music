@@ -113,6 +113,19 @@ internal object GuardianCloudRestore {
                     insert(PlaylistSongMap(playlistId=playlist.id, songId=id, position=position))
                 }
             }
+            for (extension in current.appendTracks) {
+                check(stillCurrent()) { "Account changed" }
+                val nextPosition = db.query(
+                    "SELECT COALESCE(MAX(position),-1)+1 FROM playlist_song_map WHERE playlistId=?",
+                    arrayOf<Any?>(extension.playlistId)
+                ).use { cursor -> check(cursor.moveToFirst()); cursor.getLong(0) }
+                require(nextPosition >= 0L && nextPosition + extension.tracks.size <= Int.MAX_VALUE.toLong())
+                for ((offset, id) in extension.tracks.withIndex()) {
+                    check(stillCurrent()) { "Account changed" }
+                    insert(PlaylistSongMap(playlistId=extension.playlistId, songId=id,
+                        position=(nextPosition + offset).toInt()))
+                }
+            }
             check(stillCurrent()) { "Account changed" }
         }
     }
