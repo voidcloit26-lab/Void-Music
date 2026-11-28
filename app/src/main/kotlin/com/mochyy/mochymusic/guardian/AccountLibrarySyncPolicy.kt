@@ -5,7 +5,7 @@ package com.mochyy.mochymusic.guardian
 internal object AccountLibrarySyncPolicy {
     enum class Action { CURRENT, ALREADY_SAVED, UPLOAD, REVIEW }
     fun decide(baseline: CloudSyncPolicy.Baseline, revision: Long,
-               remoteDigest: String, localDigest: String, excluded: Int): Action {
+               remoteDigest: String, localDigest: String, excluded: Int, additive: Boolean): Action {
         val digest = Regex("[a-f0-9]{64}")
         require(baseline.account.matches(Regex("[a-f0-9]{32}")))
         require(baseline.revision in 1 until Long.MAX_VALUE && revision in 1 until Long.MAX_VALUE)
@@ -13,7 +13,7 @@ internal object AccountLibrarySyncPolicy {
         require(excluded >= 0)
         if (excluded != 0) return Action.REVIEW
         if (revision == baseline.revision && remoteDigest == baseline.digest) {
-            return if (localDigest == remoteDigest) Action.CURRENT else Action.UPLOAD
+            return if (localDigest == remoteDigest) Action.CURRENT else if (additive) Action.UPLOAD else Action.REVIEW
         }
         // A lost response is safely reconciled only if the current complete
         // local snapshot is exactly the one now stored on the server.
