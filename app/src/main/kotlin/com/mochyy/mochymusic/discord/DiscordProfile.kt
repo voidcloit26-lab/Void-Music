@@ -5,9 +5,7 @@ package com.mochyy.mochymusic.discord
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -34,31 +32,32 @@ data class DiscordProfile(
         fun fromJson(text: String?): DiscordProfile? =
             text?.let { runCatching { json.decodeFromString(serializer(), it) }.getOrNull() }
 
-        /**
-         * Reads the account behind [token]. The name and picture always come; the bio, pronouns
-         * and banner only when Discord shares the full profile with this kind of login, so they
-         * stay empty otherwise rather than failing the sign-in.
-         */
+        /** Reads the documented current-user endpoint using the identify scope. */
         suspend fun fetch(token: String): DiscordProfile {
             val me = DiscordHttp.get("/users/@me", token)
             check(me.ok) { "Discord didn't share the account (HTTP ${me.code})" }
-            val user = json.parseToJsonElement(me.body).jsonObject
-            val id = user.text("id") ?: error("Discord sent an account without an id")
-            val username = user.text("username") ?: id
+            return parseCurrentUser(me.body)
+        }
+
+        internal fun parseCurrentUser(body: String): DiscordProfile {
+            val user = json.parseToJsonElement(body).jsonObject
+            val id = user.text("id")?.takeIf { it.matches(Regex("[0-9]{17,20}")) }
+                ?: error("Invalid Discord account id")
+            val username = user.text("username") ?: error("Missing Discord username")
             return DiscordProfile(
                 id = id,
                 username = username,
                 displayName = user.text("global_name") ?: username,
-                avatarUrl = avatarUrl(id, user.text("avatar")),
-                bannerUrl = user.text("banner")?.let { "$Cdn/banners/$id/$it.png?size=512" },
-                bannerColor = user.number("accent_color"),
+                avatarUrl = avatarUrl(id, user.asset("avatar")),
+                bannerUrl = user.asset("banner")?.let { "$Cdn/banners/$id/$it.png?size=512" },
+                bannerColor = user.number("accent_color")?.takeIf { it in 0..0xFFFFFF },
             )
         }
 
         /** Discord's picture, or the coloured default it gives accounts without one */
         private fun avatarUrl(id: String, hash: String?): String {
             if (hash != null) return "$Cdn/avatars/$id/$hash.png?size=256"
-            val index = (id.toLongOrNull()?.shr(22) ?: 0L) % 6
+            val index = (id.toULong() shr 22) % 6uL
             return "$Cdn/embed/avatars/$index.png"
         }
 
@@ -67,9 +66,7 @@ data class DiscordProfile(
 
         private fun JsonObject.number(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
 
-        /** a theme's first colour beats the plain accent: it's what the profile actually shows */
-        private fun JsonObject.color(): Int? =
-            runCatching { this["theme_colors"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.int }.getOrNull()
-                ?: number("accent_color")
+        private fun JsonObject.asset(key: String): String? =
+            text(key)?.takeIf { it.matches(Regex("(a_)?[0-9a-fA-F]{32}")) }
     }
 }
