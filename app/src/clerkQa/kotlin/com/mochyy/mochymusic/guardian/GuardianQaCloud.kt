@@ -185,6 +185,57 @@ internal class GuardianQaCloud(
         return response.getLong("revision").also { check(it == approved.revision + 1) }
     }
 
+    data class ClearPreview(val account: String, val revision: Long, val digest: String,
+        val favorites: Int, val playlists: Int)
+
+    /** Read authenticated remote metadata independently of local ownership.
+     * This operation never reads or modifies another account's local library. */
+    private suspend fun requireRemoteAccount(account: String) {
+        require(account.matches(Regex("[a-f0-9]{32}")))
+        check(isCurrent()) { "Account changed" }
+        val status = client.request("status", emptyMap())
+        check(isCurrent() && status.getString("account") == account) { "Account changed" }
+    }
+
+    suspend fun previewClear(account: String): ClearPreview? {
+        requireRemoteAccount(account)
+        val remote = client.request("cloud_read", emptyMap())
+        check(isCurrent())
+        val revision = remote.getLong("revision")
+        if (remote.isNull("library")) {
+            check(revision == 0L)
+            return null
+        }
+        require(revision in 1 until Long.MAX_VALUE)
+        val body = remoteBody(remote)
+        val digest = CloudMetadata.parse(body).digest()
+        val favorites = (body["favorites"] as List<*>).size
+        val playlists = (body["playlists"] as List<*>).size
+        return ClearPreview(account, revision, digest, favorites, playlists)
+    }
+
+    suspend fun confirmClear(approved: ClearPreview, confirmed: Boolean): Long {
+        require(confirmed)
+        check(previewClear(approved.account) == approved && isCurrent()) { "Backup changed; review again" }
+        val response = client.request("cloud_clear", mapOf("revision" to approved.revision))
+        check(isCurrent())
+        return response.getLong("revision").also { check(it == approved.revision + 1) }
+    }
+
+    /** Export only the authenticated remote snapshot; no recovery material,
+     * device identity, OAuth credentials or local paths. */
+    suspend fun exportRemote(account: String): ByteArray {
+        requireRemoteAccount(account)
+        val remote = client.request("cloud_read", emptyMap())
+        check(isCurrent())
+        val revision = remote.getLong("revision")
+        check(revision > 0L && !remote.isNull("library"))
+        val body = remoteBody(remote)
+        CloudMetadata.parse(body)
+        return AccountProofV2.canonicalBody("cloud_write", mapOf("revision" to revision, "library" to body))
+            .toByteArray(Charsets.UTF_8)
+    }
+
     data class PreferencePreview(val account: String, val revision: Long, val digest: String,
         val local: GuardianPlaybackPreferences.Saved, val remote: GuardianPlaybackPreferences.Saved?)
 
