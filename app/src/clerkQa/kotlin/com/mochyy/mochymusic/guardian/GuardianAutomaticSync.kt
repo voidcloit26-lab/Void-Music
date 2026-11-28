@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Process/session-only consent; no background scheduler, credential persistence,
- * implicit first backup, automatic restore, deletion or retry after a conflict. */
+/** Account-scoped consent and acknowledged baselines are supplied by the runtime.
+ * No background credential persistence, automatic deletion or retry after a conflict. */
 internal object GuardianAutomaticSync {
     enum class Status { DISABLED, ENABLED, SYNCING, REVIEW_REQUIRED }
     interface Port {
@@ -23,7 +23,9 @@ internal object GuardianAutomaticSync {
         val account: String,
         val cloud: Port,
         val baseline: CloudSyncPolicy.Baseline,
-        val stillCurrent: () -> Boolean
+        val stillCurrent: () -> Boolean,
+        val onBaseline: (CloudSyncPolicy.Baseline) -> Unit,
+        val onReview: () -> Unit
     )
     private val lock = Any()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,19 +35,23 @@ internal object GuardianAutomaticSync {
     private var configuration: Configuration? = null
     private var job: Job? = null
 
-    suspend fun enable(account: String, cloud: Port, stillCurrent: () -> Boolean): Boolean =
+    suspend fun enable(account: String, cloud: Port, stillCurrent: () -> Boolean,
+                       resume: CloudSyncPolicy.Baseline? = null,
+                       onBaseline: (CloudSyncPolicy.Baseline) -> Unit = {},
+                       onReview: () -> Unit = {}): Boolean =
         withContext(Dispatchers.IO) {
             val started = synchronized(lock) {
                 check(configuration == null && job?.isCompleted != false)
                 generation
             }
             check(stillCurrent())
-            val baseline = cloud.prepareAutomatic(account)
+            val baseline = resume ?: cloud.prepareAutomatic(account)
             require(baseline.account == account && baseline.revision in 1 until Long.MAX_VALUE &&
                 baseline.digest.matches(Regex("[a-f0-9]{64}")))
             synchronized(lock) {
                 if (generation != started || !stillCurrent() || configuration != null) return@synchronized false
-                configuration = Configuration(account, cloud, baseline, stillCurrent)
+                onBaseline(baseline)
+                configuration = Configuration(account, cloud, baseline, stillCurrent, onBaseline, onReview)
                 state.value = Status.ENABLED
                 true
             }
@@ -76,6 +82,7 @@ internal object GuardianAutomaticSync {
                     synchronized(lock) {
                         if (configuration === selected) {
                             if (selected.stillCurrent()) {
+                                selected.onBaseline(updated)
                                 configuration = selected.copy(baseline = updated)
                                 state.value = Status.ENABLED
                             } else {
@@ -86,11 +93,20 @@ internal object GuardianAutomaticSync {
                     }
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                     synchronized(lock) {
                         if (configuration === selected) {
-                            configuration = null
-                            state.value = Status.REVIEW_REQUIRED
+                            val retryable = e is java.io.IOException ||
+                                (e is GuardianAccountClient.RequestFailed && (e.status == 429 || e.status in 500..599))
+                            if (retryable && selected.stillCurrent()) {
+                                // The next successful membership refresh can retry safely.
+                                // CAS and digest checks still reject ambiguous/conflicting writes.
+                                state.value = Status.ENABLED
+                            } else {
+                                configuration = null
+                                runCatching { selected.onReview() }
+                                state.value = Status.REVIEW_REQUIRED
+                            }
                         }
                     }
                 }
