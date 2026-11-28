@@ -33,6 +33,7 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
     var list by remember { mutableStateOf<org.json.JSONArray?>(null) }
     var account by remember { mutableStateOf("") }
     var member by remember { mutableStateOf<JSONObject?>(null) }
+    var claimHistory by remember { mutableStateOf<JSONObject?>(null) }
     var price by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf<String?>(null) }
     fun run(block: suspend () -> Unit) {
@@ -45,7 +46,7 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
             catch (e: GuardianAccountClient.RequestFailed) {
                 error = if (e.status in listOf(401,403)) "Owner access requires a verified owner account and fresh MFA. Reauthenticate, then retry."
                     else "Guardian Business unavailable. Refresh before retrying."
-                if (e.status in listOf(401,403)) { summary = null; codes = emptyList(); list = null; member = null; confirmation = null; copyFeedback = "" }
+                if (e.status in listOf(401,403)) { summary = null; codes = emptyList(); list = null; member = null; claimHistory = null; confirmation = null; copyFeedback = "" }
             } catch (_: Exception) { error = "Unable to complete request. Check the connection and refresh." }
             finally { busy = false }
         }
@@ -108,9 +109,20 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
             }
             Text("Member management",style=MaterialTheme.typography.titleLarge)
             OutlinedTextField(account,{account=it.trim().take(32)},label={Text("VOID account ID")},singleLine=true)
-            Button(onClick={run {member=null;member=client.request("member",JSONObject().put("account",account))}},enabled=!busy && Regex("[a-f0-9]{32}").matches(account)){Text("Find member")}
+            Button(onClick={run {member=null;claimHistory=null;member=client.request("member",JSONObject().put("account",account))}},enabled=!busy && Regex("[a-f0-9]{32}").matches(account)){Text("Find member")}
             member?.let { m ->
                 Text(m.optString("account")+" · "+m.optString("status"))
+                OutlinedButton(onClick={run { claimHistory=client.request("codes/history",JSONObject().put("account",m.getString("account"))) }},enabled=!busy) { Text("View premium claim history") }
+                claimHistory?.takeIf { it.optString("account") == m.optString("account") }?.let { history ->
+                    Text("Total claims: "+history.optInt("total_claims")+" · Renewals: "+history.optInt("renewals"))
+                    val events=history.getJSONArray("events")
+                    for (i in 0 until events.length()) {
+                        val event=events.getJSONObject(i)
+                        Text("#"+event.optInt("claim_number")+" · "+event.optString("kind")+" · "+
+                            java.text.DateFormat.getDateTimeInstance().format(java.util.Date(event.optLong("claimed_at")*1000L)))
+                        Text("Reference: "+event.optString("reference"),style=MaterialTheme.typography.bodySmall)
+                    }
+                }
                 for(state in listOf("suspended","enabled","revoked")) {
                     OutlinedButton(onClick={confirmation="state:"+m.getString("account")+":"+state},enabled=!busy){Text(when(state){"suspended"->"Suspend";"enabled"->"Reinstate";else->"Revoke"})}
                 }
