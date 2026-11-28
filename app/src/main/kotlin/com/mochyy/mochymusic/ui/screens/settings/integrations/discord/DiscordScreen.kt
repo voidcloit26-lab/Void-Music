@@ -200,7 +200,7 @@ fun DiscordScreen(
                 modifier = Modifier.onGloballyPositioned { previewBottomPx = it.boundsInWindow().bottom },
             )
             Spacer(Modifier.height(12.dp))
-            DiscordNoticeCard("Profile linking uses Discord's official authorization page; no password or token is entered in VOID Music. Profile details stay in memory until the app restarts. Unsupported animated artwork uses a public still image or the VOID logo.")
+            DiscordNoticeCard("Profile linking uses Discord's official authorization page; no password or token is entered in VOID Music. For verified VOID accounts, only profile display details are saved privately on this device; unlink to remove them. No OAuth tokens are saved. Unsupported animated artwork uses a public still image or the VOID logo.")
             CustomizeSection(
                 settings = settings,
                 edit = viewModel::edit,
