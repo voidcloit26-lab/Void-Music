@@ -54,8 +54,22 @@ extensions.configure<ApplicationExtension> {
         applicationId = "online.voidbot.music"
         minSdk = 24
         targetSdk = 37
-        versionCode = 73
-        versionName = "8.4.6 build#1301"
+        val stableUpdate = System.getenv("VOID_STABLE_UPDATE_ENABLED") == "true"
+        val stableVersionCode = System.getenv("VOID_STABLE_VERSION_CODE")
+        val stableVersionName = System.getenv("VOID_STABLE_VERSION_NAME")
+        val stableReleaseKey = System.getenv("VOID_RELEASE_POLICY_PUBLIC_KEY") ?: ""
+        val stableApkOrigin = System.getenv("VOID_RELEASE_APK_ORIGIN") ?: ""
+        require(!stableUpdate || ((stableVersionCode?.toIntOrNull() ?: 0) in 74..2100000000 &&
+            stableVersionName?.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+")) == true &&
+            stableReleaseKey.matches(Regex("[A-Za-z0-9_-]{64,256}")) &&
+            stableApkOrigin.matches(Regex("https://[A-Za-z0-9.-]+/?")))) {
+            "Stable update builds require a version, HTTPS APK origin and pinned release-policy public key"
+        }
+        versionCode = if (stableUpdate) requireNotNull(stableVersionCode).toInt() else 73
+        versionName = if (stableUpdate) requireNotNull(stableVersionName) else "8.4.6 build#1301"
+        buildConfigField("Boolean", "VOID_STABLE_UPDATE_ENABLED", stableUpdate.toString())
+        buildConfigField("String", "VOID_RELEASE_POLICY_PUBLIC_KEY", "\"$stableReleaseKey\"")
+        buildConfigField("String", "VOID_RELEASE_APK_ORIGIN", "\"$stableApkOrigin\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -73,6 +87,10 @@ extensions.configure<ApplicationExtension> {
             System.getenv("KEY_ALIAS") != null &&
             System.getenv("KEY_PASSWORD") != null &&
             file("keystore/release.keystore").exists()
+        require(!stableUpdate || hasReleaseKeystore) { "Stable builds require permanent APK signing" }
+        require(stableUpdate || (stableReleaseKey.isEmpty() && stableApkOrigin.isEmpty())) {
+            "Do not supply stable release configuration to internal test builds"
+        }
         val expectedCertBytes: ByteArray = when {
             hasReleaseKeystore -> runCatching {
                 val ks = KeyStore.getInstance(KeyStore.getDefaultType())
@@ -183,6 +201,7 @@ extensions.configure<ApplicationExtension> {
         require(!guardianV2Enforced || (clerkQaEnabled && !guardianEnforced)) {
             "V2 staging gate requires Clerk enabled and V1 disabled"
         }
+        require(!stableUpdate || guardianV2Enforced) { "Stable updates require Guardian V2 enforcement" }
         buildConfigField("Boolean", "VOID_GUARDIAN_V2_ENFORCED", guardianV2Enforced.toString())
         manifestPlaceholders["voidAllowBackup"] = (!guardianV2Enforced).toString()
         manifestPlaceholders["voidCarServiceEnabled"] = (!guardianV2Enforced).toString()
