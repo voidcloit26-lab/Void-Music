@@ -51,7 +51,7 @@ internal class GuardianQaCloud(
     }
 
     data class FirstBackup(val account: String, val preview: GuardianCloudSnapshot.Preview)
-    data class UpdatePreview(val account: String, val revision: Long, val remoteDigest: String, val local: GuardianCloudSnapshot.Preview)
+    data class UpdatePreview(val account: String, val revision: Long, val remoteDigest: String, val local: GuardianCloudSnapshot.Preview, val changes: CloudLibraryChange)
     data class RestorePreview(val account: String, val revision: Long, val library: CloudRestorePlan.Library, val plan: CloudRestorePlan.Plan)
 
     private suspend fun requireAccount(account: String, active: Boolean = false) {
@@ -149,7 +149,7 @@ internal class GuardianQaCloud(
     private fun remoteBody(remote: JSONObject): Map<String, Any?> =
         remote.getJSONObject("library").let { obj -> obj.keys().asSequence().associateWith { convert(obj.get(it)) } }
 
-    /** Manual update only. Existing remote metadata is a strict lower bound. */
+    /** Explicit reviewed replacement. Automatic sync remains additive-only. */
     suspend fun previewUpdate(account: String): UpdatePreview {
         requireAccount(account, active = true)
         val remote = client.request("cloud_read", emptyMap())
@@ -165,21 +165,22 @@ internal class GuardianQaCloud(
         }
         val local = GuardianCloudSnapshot.capture(database, preferences = remotePreferences)
         val localMetadata = CloudMetadata.parse(local.body)
-        check(local.excludedEntries == 0 && localMetadata.additiveTo(remoteMetadata)) {
-            "Review library conflicts before backup"
-        }
+        check(local.excludedEntries == 0) { "Unsupported local entries prevent a complete replacement" }
         check(localMetadata.digest() != remoteMetadata.digest()) { "Backup already current" }
-        check(isCurrent())
-        return UpdatePreview(account, revision, remoteMetadata.digest(), local)
+        val changes = CloudLibraryChange.compare(existing, local.body)
+        check(isCurrent() && ownsLibrary(account))
+        return UpdatePreview(account, revision, remoteMetadata.digest(), local, changes)
     }
 
     suspend fun confirmUpdate(approved: UpdatePreview, confirmed: Boolean): Long {
         require(confirmed)
         val current = previewUpdate(approved.account)
-        check(current == approved && isCurrent()) { "Library or backup changed; preview again" }
+        check(current == approved && isCurrent() && ownsLibrary(approved.account)) {
+            "Library or backup changed; preview again"
+        }
         val response = client.request("cloud_write",
             mapOf("revision" to approved.revision, "library" to approved.local.body))
-        check(isCurrent())
+        check(isCurrent() && ownsLibrary(approved.account))
         return response.getLong("revision").also { check(it == approved.revision + 1) }
     }
 
