@@ -27,7 +27,8 @@ class ClerkProfileLookup:
         if not isinstance(subject,str) or not re.fullmatch(r"user_[A-Za-z0-9]{1,120}",subject):
             raise SessionDenied("invalid subject")
         request=Request("https://api.clerk.com/v1/users/"+subject,
-                        headers={"Authorization":"Bearer "+self._secret,"Accept":"application/json"})
+                        headers={"Authorization":"Bearer "+self._secret,"Accept":"application/json",
+                                 "Clerk-API-Version":"2026-08-20","User-Agent":"VOID-Guardian/2.0"})
         try:
             with self._opener.open(request,timeout=8) as response:
                 if response.status!=200 or response.headers.get_content_type()!="application/json":
@@ -41,8 +42,11 @@ class ClerkProfileLookup:
         except HTTPError as exc:
             # Record status only: never log credentials, user identifiers, URLs or response bodies.
             reason = "unknown"
+            response_kind = "unknown"
             try:
                 raw = exc.read(16385)
+                prefix = raw.lstrip()[:32].lower()
+                response_kind = "json" if prefix.startswith(b"{") else "html" if prefix.startswith(b"<") else "other"
                 if len(raw) <= 16384:
                     errors = json.loads(raw).get("errors", [])
                     if isinstance(errors, list):
@@ -55,7 +59,7 @@ class ClerkProfileLookup:
                 pass
             finally:
                 exc.close()
-            logging.getLogger(__name__).warning("Clerk profile lookup HTTP status=%s reason=%s", exc.code, reason)
+            logging.getLogger(__name__).warning("Clerk profile lookup HTTP status=%s reason=%s response_kind=%s", exc.code, reason, response_kind)
             raise ProfileUnavailable("identity verification unavailable") from None
         except Exception as exc:
             logging.getLogger(__name__).warning("Clerk profile lookup failed (%s)", type(exc).__name__)
