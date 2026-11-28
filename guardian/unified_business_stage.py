@@ -30,7 +30,11 @@ def create_app():
             for column in ("redeemed_account","redeemed_at"):
                 if db.execute("SELECT has_column_privilege(current_user,'guardian_v2_stage.activation_codes_v2',?,'UPDATE')",(column,)).fetchone()[0]:
                     raise PermissionError("business role cannot redeem codes")
-        api=BusinessAPI(store,sandbox=True,clerk_mode=True,activation=ActivationCodes(store,issuer=issuer))
+        collective = os.environ.get("VOID_V3_COLLECTIVE_ENABLED") == "true"
+        if collective:
+            from guardian.collective_codes_v3 import verify_stage
+            verify_stage(store, business=True)
+        api=BusinessAPI(store,sandbox=True,clerk_mode=True,activation=ActivationCodes(store,issuer=issuer,collective=collective))
     except Exception:
         raise RuntimeError("unified business staging configuration failed") from None
     def application(env,start):
