@@ -20,6 +20,43 @@ internal object ExtendedLibraryV1 {
     fun validPlay(play: Play): Boolean = publicSong(play.songId) &&
         play.timestampMs in 1L..253402300799999L && play.playedMs in 1L..MAX_PLAY_MS
 
+    /** Wire shape shared with Guardian extended library actions. */
+    fun body(snapshot: Snapshot): Map<String, Any?> {
+        val value = normalize(snapshot)
+        return mapOf(
+            "albums" to value.albums,
+            "artists" to value.artists,
+            "history" to value.history?.map {
+                mapOf("song_id" to it.songId, "timestamp_ms" to it.timestampMs, "played_ms" to it.playedMs)
+            },
+        )
+    }
+
+    fun parse(body: Map<String, Any?>): Snapshot {
+        require(body.keys == setOf("albums", "artists", "history"))
+        fun identifiers(value: Any?): List<String> {
+            val entries = requireNotNull(value as? List<*>)
+            require(entries.size <= 1000)
+            return entries.map { requireNotNull(it as? String) }
+        }
+        fun integer(value: Any?): Long = when (value) {
+            is Int -> value.toLong()
+            is Long -> value
+            else -> error("Invalid history integer")
+        }
+        val history = body["history"]?.let { raw ->
+            val entries = requireNotNull(raw as? List<*>)
+            require(entries.size <= MAX_HISTORY)
+            entries.map { entry ->
+                val play = requireNotNull(entry as? Map<*, *>)
+                require(play.keys == setOf("song_id", "timestamp_ms", "played_ms"))
+                Play(requireNotNull(play["song_id"] as? String),
+                    integer(play["timestamp_ms"]), integer(play["played_ms"]))
+            }
+        }
+        return normalize(Snapshot(identifiers(body["albums"]), identifiers(body["artists"]), history))
+    }
+
     fun normalize(snapshot: Snapshot): Snapshot {
         require(snapshot.albums.size <= MAX_ALBUMS && snapshot.albums.all(::publicAlbum))
         require(snapshot.artists.size <= MAX_ARTISTS && snapshot.artists.all(::publicArtist))
