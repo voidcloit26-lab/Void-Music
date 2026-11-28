@@ -265,11 +265,10 @@ fun SongMenu(
                 icon = if (song.song.liked) R.drawable.favorite else R.drawable.favorite_border,
                 tint = if (song.song.liked) MaterialTheme.colorScheme.error else Color.White,
                 onClick = {
-                    val s = song.song.toggleLike()
                     database.query {
-                        update(s)
+                        // Commit the local favorite before enqueueing optional provider sync.
+                        toggleLikeLocally(song.id)?.let { syncUtils.likeSong(it) }
                     }
-                    syncUtils.likeSong(s)
                 },
             )
         },
