@@ -76,17 +76,26 @@ internal object ClerkQaBridge {
 
 /** Authentication only. Signed in never means that premium is active. */
 @Composable
-internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
+internal fun ClerkQaAuthScreen(signedIn: @Composable (String) -> Unit) {
     val initialized by Clerk.isInitialized.collectAsState()
     val user by Clerk.userFlow.collectAsState()
     val activeSession by Clerk.sessionFlow.collectAsState()
     val initializationError by Clerk.initializationError.collectAsState()
     var showEmail by remember { mutableStateOf(false) }
+    var signup by remember { mutableStateOf(false) }
+    var activationCode by remember { mutableStateOf("") }
+    // Do not persist a redeemable credential in saved state or Clerk metadata.
+    androidx.compose.runtime.LaunchedEffect(user?.id, activeSession?.id) {
+        if (user == null || activeSession == null) {
+            // Clear a completed session\'s pending code when signing out, but not during initial entry.
+        }
+    }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
             !initialized && initializationError != null -> Text("Authentication unavailable. Reopen the app to retry.")
             !initialized -> CircularProgressIndicator()
-            (user == null || activeSession == null) && !showEmail -> GuardianLoginLanding { showEmail = true }
+            (user == null || activeSession == null) && !showEmail -> GuardianLoginLanding(onEmail = { signup = false; activationCode = ""; showEmail = true },
+                onSignup = { signup = true; activationCode = ""; showEmail = true })
             user == null || activeSession == null -> Column(
                 Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -118,7 +127,14 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
                 }
                 Column(Modifier.widthIn(max = 480.dp).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
                     GuardianBrandHeader("VOID Music", "Your music. Your account.")
-                    TextButton(onClick = { showEmail = false }) { Text("Other sign-in options") }
+                    TextButton(onClick = { showEmail = false; signup = false; activationCode = "" }) { Text("Other sign-in options") }
+                    if (signup) {
+                        androidx.compose.material3.OutlinedTextField(activationCode,
+                            { activationCode = it.trim().take(43) }, singleLine = true,
+                            modifier = Modifier.fillMaxWidth(), label = { Text("Activation code") },
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+                        Text("Create and verify your email account below, then confirm this code to activate premium.", style = typography.bodySmall)
+                    }
                 }
                 Box(Modifier.weight(1f).widthIn(max = 480.dp).fillMaxWidth()) {
                     AuthView(clerkTheme = theme, isDismissible = false)
@@ -127,7 +143,7 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
                     color = colors.onSurface.copy(alpha = 0.56f),
                     modifier = Modifier.padding(vertical = 8.dp))
             }
-            else -> key(user?.id, activeSession?.id) { signedIn() }
+            else -> key(user?.id, activeSession?.id) { signedIn(if (signup) activationCode else "") }
         }
     }
 }
@@ -137,7 +153,7 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable () -> Unit) {
  * Never invoke from the V1 playback gate; no real service is selected here. */
 @Composable
 internal fun ClerkGuardianQaHost(origin: String, gateEntry: Boolean = false) {
-    ClerkQaAuthScreen {
+    ClerkQaAuthScreen { signupCode ->
         val user by Clerk.userFlow.collectAsState()
         val activeSession by Clerk.sessionFlow.collectAsState()
         val subject = user?.id
@@ -167,7 +183,7 @@ internal fun ClerkGuardianQaHost(origin: String, gateEntry: Boolean = false) {
                     }
                 }
                 val business = remember(subject, sid) { GuardianBusinessQaClient(subject,sid) }
-                GuardianAccountQaScreen(client, lease, cloud, business, gateEntry, onSignOut = {
+                GuardianAccountQaScreen(client, lease, cloud, business, gateEntry, initialCode = signupCode, onSignOut = {
                     // Invalidate playback and in-flight sync before remote sign-out.
                     GuardianV2Runtime.clear(context.applicationContext)
                     lease.clear()
