@@ -392,13 +392,13 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             if (status == "active" && libraryMatches && GuardianGate.v2Enforced) {
                 Text(when (automaticSyncStatus) {
                     GuardianAutomaticSync.Status.DISABLED -> "Automatic backup: off"
-                    GuardianAutomaticSync.Status.ENABLED -> "Automatic backup: on for this session"
+                    GuardianAutomaticSync.Status.ENABLED -> "Automatic library backup: on"
                     GuardianAutomaticSync.Status.SYNCING -> "Automatic backup: checking additions"
                     GuardianAutomaticSync.Status.REVIEW_REQUIRED -> "Automatic backup paused. Review your library manually."
                 })
                 if (automaticSyncStatus == GuardianAutomaticSync.Status.ENABLED ||
                     automaticSyncStatus == GuardianAutomaticSync.Status.SYNCING) {
-                    OutlinedButton(onClick = { GuardianAutomaticSync.disable() }, enabled = !busy) {
+                    OutlinedButton(onClick = { GuardianV2Runtime.disableAutomaticSync(context) }, enabled = !busy) {
                         Text("Disable automatic backup")
                     }
                 } else {
@@ -410,7 +410,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }
             }
             if (!libraryMatches) Text("Local backup and restore require a verified library owner.")
-            Text("No audio files or automatic deletions. Automatic backup requires your explicit consent and a matching reviewed library.")
+            Text("Audio files stay on this phone. Automatic metadata backup requires your consent; conflicts require review.")
             } // Advanced controls are hidden during normal account use.
         } else if (linkRequired) {
             Text(if (recognizedOwner) "Owner account" else "Complete your VOID account",
@@ -548,12 +548,12 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         AlertDialog(
             onDismissRequest = { confirmAutoSync = null },
             title = { Text("Enable automatic backup?") },
-            text = { Text("Your saved favorites and independent playlist additions may be uploaded during successful membership refreshes while this session is active. First make sure the reviewed cloud backup matches your local library. Removals, conflicts and settings changes require manual review. Sign-out or restarting the app disables this feature. An upload already sent cannot be recalled.") },
+            text = { Text("Eligible favorites and independent playlists are saved to your VOID account, not Gmail storage. Your choice is remembered on this device for this account. Audio stays on your phone. An existing cloud library must match before synchronization starts. Removals, conflicts and settings changes require review. Sign-out pauses synchronization; you can disable it here.") },
             confirmButton = { TextButton(onClick = {
                 confirmAutoSync = null
                 run {
                     if (GuardianV2Runtime.enableAutomaticSync(context, accountId)) {
-                        cloudSummary = "Automatic backup enabled for this session."
+                        cloudSummary = "Automatic library backup enabled for this account on this device."
                     } else {
                         error = "Open your authorized music session first, then return to VOID Account."
                     }
