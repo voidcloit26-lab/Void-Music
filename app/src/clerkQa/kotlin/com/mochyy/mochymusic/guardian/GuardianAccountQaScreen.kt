@@ -48,6 +48,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var approvedUpdate by remember(client) { mutableStateOf<GuardianQaCloud.UpdatePreview?>(null) }
     var approvedPreferences by remember(client) { mutableStateOf<GuardianQaCloud.PreferencePreview?>(null) }
     var confirmAutoSync by remember(client) { mutableStateOf<String?>(null) }
+    var confirmCloudRestore by remember(client) { mutableStateOf<String?>(null) }
     val automaticSyncStatus by GuardianAutomaticSync.status.collectAsState()
 
     suspend fun refresh() {
@@ -322,6 +323,18 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     }, enabled = !busy && Regex("[A-Za-z0-9_-]{43}").matches(key)) { Text("Claim code") }
                 }
             }
+            if (status == "active" && libraryMatches && !gateEntry) {
+                OutlinedButton(onClick = { confirmCloudRestore = accountId },
+                    enabled = !busy && newRecovery == null, modifier = Modifier.fillMaxWidth()) {
+                    Text("Restore my saved library")
+                }
+                Text(when (automaticSyncStatus) {
+                    GuardianAutomaticSync.Status.DISABLED -> "Cloud backup: off"
+                    GuardianAutomaticSync.Status.ENABLED -> "Cloud backup: on"
+                    GuardianAutomaticSync.Status.SYNCING -> "Cloud backup: syncing"
+                    GuardianAutomaticSync.Status.REVIEW_REQUIRED -> "Cloud backup: review needed"
+                }, style = MaterialTheme.typography.bodySmall)
+            }
             OutlinedButton(onClick = { showAdvanced = !showAdvanced }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                 Text(if (showAdvanced) "Hide account security & backup" else "Account security & backup")
             }
@@ -543,6 +556,21 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }, enabled = !busy) { Text("I own this library — back up") }
             },
             dismissButton = { TextButton(onClick = { approvedBackup = null }, enabled = !busy) { Text("Cancel") } })
+    }
+    confirmCloudRestore?.let { accountId ->
+        AlertDialog(
+            onDismissRequest = { confirmCloudRestore = null },
+            title = { Text("Restore your music library?") },
+            text = { Text("Restore saved favorites and independent playlists from this VOID account. Missing song details will be fetched from the music provider. Existing local music and downloads will not be deleted or overwritten.") },
+            confirmButton = { TextButton(onClick = {
+                confirmCloudRestore = null
+                run {
+                    val restored = cloud.restoreAccountLibrary(accountId)
+                    notice = if (restored == null) "No saved library found." else "Your saved library has been restored."
+                }
+            }, enabled = !busy) { Text("Restore") } },
+            dismissButton = { TextButton(onClick = { confirmCloudRestore = null }) { Text("Cancel") } }
+        )
     }
     confirmAutoSync?.let { accountId ->
         AlertDialog(
