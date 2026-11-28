@@ -36,4 +36,10 @@ class OwnerBootstrap:
         return account,recovery,Membership("lifetime",None)
 
     def role(self,session):
-        return "owner" if self.recognized(session) else "member"
+        # A configured owner's failed identity verification is not a regular
+        # customer signup. Do not silently downgrade or show a purchase prompt.
+        if session.issuer != self.policy.issuer or session.subject not in self.policy.owners:
+            return "member"
+        if not self.recognized(session):
+            raise MembershipDenied("owner identity verification required")
+        return "owner"
