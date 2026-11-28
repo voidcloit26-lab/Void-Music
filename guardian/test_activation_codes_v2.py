@@ -91,4 +91,67 @@ class ActivationTests(unittest.TestCase):
         self.assertEqual(len(rows),5)
         self.assertFalse(any(code in str(rows) for code in codes))
 
+    def enable_collective(self):
+        from guardian.collective_codes_v3 import DDL, REDEMPTIONS_DDL, INDEX_DDL
+        with self.store.transaction() as db:
+            for sql in (DDL, REDEMPTIONS_DDL, INDEX_DDL):
+                db.execute(sql)
+        self.codes.collective = True
+
+    def test_collective_cap_and_history(self):
+        self.enable_collective()
+        code = self.issue("annual", claim_limit=2)
+        a, _, _ = self.register(code)
+        b, _, _ = self.register(code, "user_second", "b"*64)
+        with self.assertRaises(MembershipDenied):
+            self.register(code, "user_third", "c"*64)
+        with self.store.transaction() as db:
+            self.assertEqual(db.execute("SELECT used_count FROM collective_codes_v3").fetchone()[0], 2)
+            rows = db.execute("SELECT account,new_expiry FROM collective_redemptions_v3").fetchall()
+            self.assertEqual({r[0] for r in rows}, {a,b})
+            self.assertTrue(all(r[1] == annual_end(self.now) for r in rows))
+
+    def test_collective_renewal_once_per_account(self):
+        self.enable_collective()
+        _, _, old = self.register(self.issue("annual"))
+        code = self.issue("renewal", claim_limit=5)
+        new = self.codes.redeem(self.issuer, "user_first", "a"*64, code)
+        self.assertEqual(new.expires_at, annual_end(old.expires_at))
+        with self.assertRaises(MembershipDenied):
+            self.codes.redeem(self.issuer, "user_first", "a"*64, code)
+        with self.store.transaction() as db:
+            self.assertEqual(db.execute("SELECT used_count FROM collective_codes_v3").fetchone()[0], 1)
+
+    def test_collective_concurrent_cap(self):
+        self.enable_collective()
+        code = self.issue("annual", claim_limit=3)
+        def attempt(i):
+            try:
+                self.register(code, "user_c"+str(i), format(i+1,"064x"))
+                return True
+            except MembershipDenied:
+                return False
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            self.assertEqual(sum(pool.map(attempt, range(8))), 3)
+
+    def test_collective_cancel_expiry_and_disabled(self):
+        with self.assertRaises(ValueError):
+            self.issue("annual", claim_limit=2)
+        self.enable_collective()
+        code = self.issue("annual", claim_limit=3)
+        self.register(code)
+        self.assertTrue(self.codes.cancel("owner-test", self.store._digest("activation-v2",code).hex()))
+        with self.assertRaises(MembershipDenied):
+            self.register(code, "user_other", "b"*64)
+        expired = self.issue("annual", claim_limit=2, ttl=1)
+        self.now += 1
+        with self.assertRaises(MembershipDenied):
+            self.register(expired, "user_other", "b"*64)
+
+    def test_collective_rejects_subject_and_batch(self):
+        self.enable_collective()
+        for args in ({"subject":"user_first"}, {"count":2}, {"claim_limit":101}):
+            with self.assertRaises(ValueError):
+                self.codes.issue("owner-test", "annual", **({"claim_limit":2} | args))
+
 if __name__=="__main__": unittest.main()
