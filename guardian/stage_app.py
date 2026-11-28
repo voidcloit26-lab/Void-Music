@@ -47,7 +47,11 @@ def create_app():
                 for privilege in ('INSERT','DELETE'):
                     if db.execute("SELECT has_table_privilege(current_user,'guardian_v2_stage.activation_codes_v2',?)",(privilege,)).fetchone()[0]:
                         raise PermissionError('unsafe activation grants')
-            activation_codes = ActivationCodes(store)
+            collective = os.environ.get('VOID_V3_COLLECTIVE_ENABLED') == 'true'
+            if collective:
+                from guardian.collective_codes_v3 import verify_stage
+                verify_stage(store)
+            activation_codes = ActivationCodes(store, collective=collective)
             profile_lookup = ClerkProfileLookup(os.environ['VOID_V2_CLERK_SECRET_KEY'])
         owner_bootstrap = None
         if os.environ.get('VOID_V2_OWNER_IDENTITY_ENABLED') == 'true':
