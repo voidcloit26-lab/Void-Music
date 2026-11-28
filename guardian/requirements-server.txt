@@ -1,5 +1,5 @@
 -r requirements.txt
-gunicorn>=23,<24
+gunicorn==27.0.1
 psycopg[binary]>=3.2,<4
 certifi>=2025.1.31
 PyJWT[crypto]==2.13.0
