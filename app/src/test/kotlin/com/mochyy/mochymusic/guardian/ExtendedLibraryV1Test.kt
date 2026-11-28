@@ -32,4 +32,16 @@ class ExtendedLibraryV1Test {
         assertEquals(listOf(first, second), ExtendedLibraryV1.normalize(snapshot).history)
         assertTrue(runCatching { ExtendedLibraryV1.normalize(snapshot.copy(history = listOf(first, first))) }.isFailure)
     }
+    @Test fun wireFormatPreservesConsentAndRejectsUnexpectedFields() {
+        val snapshot = ExtendedLibraryV1.Snapshot(listOf(album), listOf(artist),
+            listOf(ExtendedLibraryV1.Play(song, 1000L, 500L)))
+        val wire = ExtendedLibraryV1.body(snapshot)
+        assertEquals(snapshot, ExtendedLibraryV1.parse(wire))
+        assertNull(ExtendedLibraryV1.parse(wire + ("history" to null)).history)
+        assertTrue(runCatching { ExtendedLibraryV1.parse(wire + ("token" to "secret")) }.isFailure)
+        assertTrue(runCatching { ExtendedLibraryV1.parse(wire + ("history" to listOf(
+            mapOf("song_id" to song, "timestamp_ms" to true, "played_ms" to 500L)))) }.isFailure)
+        assertTrue(AccountProofV2.canonicalBody("extended_write",
+            mapOf("revision" to 0L, "library" to wire)).contains("timestamp_ms"))
+    }
 }
