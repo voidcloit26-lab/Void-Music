@@ -180,6 +180,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             downloadAndInstall = {
                 GuardianStableUpdate.downloadAndInstall(context, client, pendingRelease)
             },
+            refreshRelease = { refresh() },
             onOptionalDismiss = {
                 if (pendingRelease.decision == "available") {
                     dismissedRelease = pendingRelease.release.sequence
