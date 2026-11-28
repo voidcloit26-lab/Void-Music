@@ -10,7 +10,7 @@ internal object AccountProofV2 {
         "identity_role" to emptySet(), "register_owner" to emptySet(),
         "rotate_recovery" to emptySet(), "lease" to emptySet(),
         "lease_versioned" to setOf("version_code", "signer_sha256"),
-        "status" to emptySet(), "redeem_free" to setOf("code"),
+        "status" to emptySet(), "profile" to emptySet(), "redeem_free" to setOf("code"),
         "cloud_read" to emptySet(), "cloud_write" to setOf("revision", "library"),
         "cloud_clear" to setOf("revision"), "release_policy" to emptySet(),
         "backup_for_upgrade" to setOf("revision", "library"),
