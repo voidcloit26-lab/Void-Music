@@ -25,6 +25,7 @@ internal fun GuardianUpgradeScreen(
     cloud: GuardianQaCloud,
     account: String,
     downloadAndInstall: suspend () -> Boolean,
+    refreshRelease: suspend () -> Unit,
     onOptionalDismiss: () -> Unit
 ) {
     val decision = release.decision(installedVersion)
@@ -88,6 +89,8 @@ internal fun GuardianUpgradeScreen(
             shape = RoundedCornerShape(18.dp)) {
             Text("Download & install update")
         }
+        TextButton(onClick = { run { refreshRelease() } }, enabled = !busy && receipt == null,
+            modifier = Modifier.fillMaxWidth()) { Text("Check for latest release") }
         if (decision == "available") TextButton(onClick = onOptionalDismiss, enabled = !busy && receipt == null) {
             Text("Later")
         }
