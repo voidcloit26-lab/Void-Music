@@ -46,7 +46,7 @@ class BusinessAPI:
         self.activation = activation
         self.routes = dict(ROUTES)
         if activation is not None:
-            self.routes.update({'/owner/v2/codes/create': ({'kind'}, {'days','ttl','count','subject'}),
+            self.routes.update({'/owner/v2/codes/create': ({'kind'}, {'days','ttl','count','subject','claim_limit'}),
                                 '/owner/v2/codes/list': (set(), {'limit'}),
                                 '/owner/v2/codes/cancel': ({'code_id'}, set())})
 
