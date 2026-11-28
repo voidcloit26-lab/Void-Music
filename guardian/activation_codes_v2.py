@@ -142,6 +142,30 @@ class ActivationCodes:
             self.store._require_device(db,account,device)
             return self._claim(db,identity,account,code,self.store._now())
 
+    def history(self, credential, account, limit=100):
+        """Owner-only account history; never return raw activation codes."""
+        self.store._owner(credential)
+        account = self.store._account(account)
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("invalid history limit")
+        with self.store.transaction() as db:
+            if not db.execute("SELECT 1 FROM accounts_v2 WHERE id=?", (account,)).fetchone():
+                raise MembershipDenied("unknown account")
+            rows = db.execute("SELECT digest,kind,redeemed_at FROM activation_codes_v2 WHERE redeemed_account=? AND redeemed_at IS NOT NULL ORDER BY redeemed_at DESC,digest LIMIT ?", (account,limit)).fetchall()
+            counts = dict(db.execute("SELECT kind,COUNT(*) FROM activation_codes_v2 WHERE redeemed_account=? AND redeemed_at IS NOT NULL GROUP BY kind", (account,)).fetchall())
+            events = [{"reference":bytes(row[0]).hex()[:16],"kind":row[1],"claimed_at":row[2],"collective":False} for row in rows]
+            if self.collective:
+                rows = db.execute("SELECT r.digest,c.kind,r.claimed_at,r.previous_expiry,r.new_expiry FROM collective_redemptions_v3 r JOIN collective_codes_v3 c ON c.digest=r.digest WHERE r.account=? ORDER BY r.claimed_at DESC,r.digest LIMIT ?", (account,limit)).fetchall()
+                events.extend({"reference":bytes(row[0]).hex()[:16],"kind":row[1],"claimed_at":row[2],"collective":True,"previous_expiry":row[3],"new_expiry":row[4]} for row in rows)
+                for kind, count in db.execute("SELECT c.kind,COUNT(*) FROM collective_redemptions_v3 r JOIN collective_codes_v3 c ON c.digest=r.digest WHERE r.account=? GROUP BY c.kind", (account,)).fetchall():
+                    counts[kind] = counts.get(kind,0) + count
+            total = sum(int(value) for value in counts.values())
+            events.sort(key=lambda item:(item["claimed_at"],item["reference"]),reverse=True)
+            events = events[:limit]
+            for index, event in enumerate(events):
+                event["claim_number"] = total-index
+            return {"account":account,"total_claims":total,"renewals":int(counts.get("renewal",0)),"events":events}
+
     def list(self, credential, limit=100):
         self.store._owner(credential)
         if type(limit) is not int or not 1 <= limit <= 100:
