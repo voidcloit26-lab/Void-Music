@@ -48,6 +48,7 @@ class BusinessAPI:
         if activation is not None:
             self.routes.update({'/owner/v2/codes/create': ({'kind'}, {'days','ttl','count','subject','claim_limit'}),
                                 '/owner/v2/codes/list': (set(), {'limit'}),
+                                '/owner/v2/codes/history': ({'account'}, {'limit'}),
                                 '/owner/v2/codes/cancel': ({'code_id'}, set())})
 
     def _take(self):
@@ -121,6 +122,8 @@ class BusinessAPI:
                 result = {'codes': self.activation.issue(token, **data)}
             elif path == '/owner/v2/codes/list':
                 result = {'codes': self.activation.list(token, **data)}
+            elif path == '/owner/v2/codes/history':
+                result = self.activation.history(token, **data)
             elif path == '/owner/v2/codes/cancel':
                 result = {'changed': self.activation.cancel(token, **data)}
             else:
