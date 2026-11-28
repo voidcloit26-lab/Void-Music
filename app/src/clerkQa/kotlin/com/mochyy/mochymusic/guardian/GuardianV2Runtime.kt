@@ -93,7 +93,10 @@ internal object GuardianV2Runtime {
                         binding=b
                         true
                     }
-                    if(saved) GuardianGate.changed()
+                    if(saved) {
+                        GuardianGate.changed()
+                        resumeAutomaticSync(context.applicationContext, b)
+                    }
                     saved
                 } catch(e:CancellationException){throw e}
                 catch(e:GuardianAccountClient.RequestFailed){
@@ -113,16 +116,38 @@ internal object GuardianV2Runtime {
         return refreshed
     }
 
+    private suspend fun resumeAutomaticSync(context: Context, b: Binding) {
+        if (GuardianAutomaticSync.status.value != GuardianAutomaticSync.Status.DISABLED) return
+        val baseline = GuardianSyncConsent.read(context, b.account) ?: return
+        try {
+            configureAutomaticSync(context, b, baseline)
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { /* Playback never depends on optional synchronization. */ }
+    }
+
+    fun disableAutomaticSync(context: Context) {
+        GuardianAutomaticSync.disable()
+        GuardianSyncConsent.clear(context.applicationContext)
+    }
+
     suspend fun enableAutomaticSync(context: Context, account: String): Boolean = withContext(Dispatchers.IO) {
         val app = context.applicationContext
         val b = binding ?: return@withContext false
         if (b.account != account || !allowed(app)) return@withContext false
+        configureAutomaticSync(app, b, null)
+    }
+
+    private suspend fun configureAutomaticSync(app: Context, b: Binding, baseline: CloudSyncPolicy.Baseline?): Boolean {
         val active = { binding == b && current(b) && allowed(app) }
         val client = GuardianAccountClient(origin, { ClerkQaBridge.currentSession() }, b.subject, b.session)
         val cloud = GuardianQaCloud(app, (app as com.mochyy.mochymusic.App).musicDatabase, client,
             ownsLibrary = { id -> GuardianLocalLibraryOwner.status(app, id) == LocalLibraryBinding.Status.MATCH },
             isCurrent = active)
-        GuardianAutomaticSync.enable(account, cloud, active)
+        val enabled = GuardianAutomaticSync.enable(b.account, cloud, active, resume = baseline,
+            onBaseline = { GuardianSyncConsent.write(app, it) },
+            onReview = { GuardianSyncConsent.clear(app) })
+        if (enabled) GuardianAutomaticSync.schedule(b.account)
+        return enabled
     }
 
     fun openMusic(context:Context) {
