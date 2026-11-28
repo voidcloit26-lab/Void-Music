@@ -50,6 +50,9 @@ ACTIONS = {
     "cloud_write": {"revision", "library"},
     "backup_for_upgrade": {"revision", "library"},
     "cloud_clear": {"revision"},
+    "extended_read": set(),
+    "extended_write": {"revision", "library"},
+    "extended_clear": {"revision"},
     "release_policy": set(),
     "release_download": {"sequence"},
 }
@@ -86,7 +89,7 @@ def message(nonce, fingerprint, session_id, subject, action, body):
 
 
 class AccountProtocol:
-    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None, require_activation=False, version_gate=None, download_tickets=None):
+    def __init__(self, store, verifier, *, clock=time.monotonic, max_pending=1024, lease_key=None, challenges=None, activation_codes=None, profile_lookup=None, owner_bootstrap=None, release_registry=None, require_activation=False, version_gate=None, download_tickets=None, extended_library=None):
         self.store, self.verifier, self.clock = store, verifier, clock
         self.lease_key = lease_key
         self.challenges = challenges
@@ -96,6 +99,9 @@ class AccountProtocol:
         self.release_registry = release_registry
         self.version_gate = version_gate
         self.download_tickets = download_tickets
+        self.extended_library = extended_library
+        if extended_library is not None and extended_library.identity is not store:
+            raise ValueError("extended library must use the authenticated identity store")
         self.require_activation = require_activation is True
         self.max_pending = max_pending
         self.pending = {}
@@ -105,6 +111,8 @@ class AccountProtocol:
         session = self.verifier.verify(token)
         _, fingerprint = read_device_key(public_key)
         canonical_body(action, body)
+        if action.startswith("extended_") and self.extended_library is None:
+            raise MembershipDenied("extended library disabled")
         if self.version_gate is not None and action == "lease":
             raise UpdateRequired("legacy lease protocol disabled")
         if action == "lease_versioned" and self.version_gate is None:
@@ -290,6 +298,16 @@ class AccountProtocol:
         if action == "redeem_free":
             result = self.store.redeem(account, fingerprint, body["code"])
             return {"membership": asdict(result)}
+        if action.startswith("extended_"):
+            if self.extended_library is None:
+                raise MembershipDenied("extended library disabled")
+            if action == "extended_read":
+                revision, library = self.extended_library.read(account, fingerprint)
+                return {"revision": revision, "library": library}
+            if action == "extended_write":
+                return {"revision": self.extended_library.write(account, fingerprint, body["revision"], body["library"])}
+            if action == "extended_clear":
+                return {"revision": self.extended_library.clear(account, fingerprint, body["revision"])}
         if action == "cloud_read":
             revision, library = self.store.read_library(account, fingerprint)
             return {"revision": revision, "library": library}
