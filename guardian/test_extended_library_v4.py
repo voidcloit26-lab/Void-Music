@@ -56,6 +56,17 @@ class ExtendedLibraryTests(unittest.TestCase):
         with self.assertRaises(RevisionConflict):
             self.store.clear(self.a, "a"*64, 2)
 
+    def test_album_update_preserves_history_and_explicit_history_clear(self):
+        self.store.write(self.a, "a"*64, 0, self.data)
+        update = {**self.data, "albums": [], "history": None}
+        self.assertEqual(self.store.write(self.a, "a"*64, 1, update), 2)
+        self.assertEqual(self.store.read(self.a, "a"*64)[1]["history"], self.data["history"])
+        self.now += 86400
+        self.assertEqual(self.store.clear_history(self.a, "a"*64, 2), 3)
+        self.assertEqual(self.store.read(self.a, "a"*64), (3, update))
+        with self.assertRaises(RevisionConflict):
+            self.store.clear_history(self.a, "a"*64, 2)
+
     def test_concurrent_updates(self):
         def attempt(_):
             try:
