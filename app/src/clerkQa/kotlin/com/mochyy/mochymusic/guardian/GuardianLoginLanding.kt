@@ -53,7 +53,17 @@ internal fun GuardianLoginLanding(onEmail: () -> Unit) {
             }
         }, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
             shape = RoundedCornerShape(18.dp)) {
-            Text(if (busy) "Connecting…" else "Continue with Google")
+            Text(if (busy) "Connecting…" else "Sign in with Google")
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            HorizontalDivider(modifier = Modifier.weight(1f))
+            Text("OR", style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            HorizontalDivider(modifier = Modifier.weight(1f))
         }
         OutlinedButton(onClick = onEmail, enabled = !busy,
             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoundedCornerShape(18.dp)) {
