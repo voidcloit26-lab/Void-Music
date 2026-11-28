@@ -84,12 +84,7 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable (String) -> Unit) {
     var showEmail by remember { mutableStateOf(false) }
     var signup by remember { mutableStateOf(false) }
     var activationCode by remember { mutableStateOf("") }
-    // Do not persist a redeemable credential in saved state or Clerk metadata.
-    androidx.compose.runtime.LaunchedEffect(user?.id, activeSession?.id) {
-        if (user == null || activeSession == null) {
-            // Clear a completed session\'s pending code when signing out, but not during initial entry.
-        }
-    }
+    // A redeemable credential stays in memory only until handed to the authenticated session.
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when {
             !initialized && initializationError != null -> Text("Authentication unavailable. Reopen the app to retry.")
@@ -143,7 +138,20 @@ internal fun ClerkQaAuthScreen(signedIn: @Composable (String) -> Unit) {
                     color = colors.onSurface.copy(alpha = 0.56f),
                     modifier = Modifier.padding(vertical = 8.dp))
             }
-            else -> key(user?.id, activeSession?.id) { signedIn(if (signup) activationCode else "") }
+            else -> key(user?.id, activeSession?.id) {
+                // Capture the pending code for this session only. After successful
+                // composition, clear the landing state so a later sign-in cannot
+                // inherit a prior account's activation code.
+                val sessionCode = remember { if (signup) activationCode else "" }
+                androidx.compose.runtime.SideEffect {
+                    if (signup || showEmail || activationCode.isNotEmpty()) {
+                        activationCode = ""
+                        signup = false
+                        showEmail = false
+                    }
+                }
+                signedIn(sessionCode)
+            }
         }
     }
 }
