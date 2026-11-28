@@ -81,7 +81,9 @@ def create_app():
         fairness = SharedAccountFairness(store) if os.environ.get('VOID_V2_SHARED_FAIRNESS_ENABLED') == 'true' else AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
         if tickets is not None:
-            download_api = ReleaseDownloadAPI(verifier,registry,tickets,files,fairness,AccountAPI.reply)
+            download_api = ReleaseDownloadAPI(verifier,registry,tickets,files,
+                SharedAccountFairness(store, limit=2, scope='release-download'), AccountAPI.reply,
+                budget=SharedBudget(store, bucket='release-download', limit=6))
     except Exception:
         raise RuntimeError('V2 staging configuration or database validation failed') from None
 
