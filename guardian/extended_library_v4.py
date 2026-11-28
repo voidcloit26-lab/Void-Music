@@ -68,7 +68,7 @@ class ExtendedLibraryStore:
             row = db.execute("SELECT revision,payload FROM extended_library_v4 WHERE account=?", (account,)).fetchone()
             return (row[0], json.loads(row[1])) if row else (0, None)
 
-    def _replace(self, account, device, expected, data, *, clearing=False):
+    def _replace(self, account, device, expected, data, *, clearing=False, history_only=False):
         if type(expected) is not int or not 0 <= expected < 2**63-1:
             raise ValueError("invalid revision")
         payload = normalize_extended(data)
@@ -84,6 +84,16 @@ class ExtendedLibraryStore:
             revision = row[0] if row else 0
             if expected != revision:
                 raise RevisionConflict("review extended library before saving")
+            if history_only:
+                current = json.loads(row[1]) if row else dict(EMPTY)
+                current["history"] = None
+                payload = normalize_extended(current)
+            elif not clearing and row and data["history"] is None:
+                # Opting out of history collection must not silently remove
+                # previously saved history when albums/artists are updated.
+                current = json.loads(payload)
+                current["history"] = json.loads(row[1])["history"]
+                payload = normalize_extended(current)
             if not clearing and row and row[1] == payload:
                 return revision
             db.execute("""INSERT INTO extended_library_v4 (account,revision,payload,updated_at)
@@ -97,3 +107,7 @@ class ExtendedLibraryStore:
     def clear(self, account, device, expected):
         # Preserve a revisioned empty snapshot; old clients cannot revive data.
         return self._replace(account, device, expected, EMPTY, clearing=True)
+
+    def clear_history(self, account, device, expected):
+        # Clear listening history separately, even after membership expires.
+        return self._replace(account, device, expected, EMPTY, clearing=True, history_only=True)
