@@ -25,11 +25,13 @@ class DiscordLoginActivity : Activity() {
     }
 
     private fun handle(intent: Intent?) {
-        intent?.data?.let { redirect ->
-            EntryPointAccessors.fromApplication(applicationContext, DiscordEntryPoint::class.java)
-                .discordAuth()
-                .handleRedirect(redirect)
+        val redirect = intent?.data
+        val auth = EntryPointAccessors.fromApplication(applicationContext, DiscordEntryPoint::class.java).discordAuth()
+        if (redirect == null || !auth.isCallback(redirect)) {
+            finish()
+            return
         }
+        auth.handleRedirect(redirect)
         startActivity(
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
         )
