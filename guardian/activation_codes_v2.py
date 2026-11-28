@@ -20,14 +20,19 @@ DDL = """CREATE TABLE IF NOT EXISTS activation_codes_v2 (
 
 
 class ActivationCodes:
-    def __init__(self, store, *, issuer=None):
+    def __init__(self, store, *, issuer=None, collective=False):
         self.store = store
         self.issuer = issuer or getattr(store, 'issuer', None)
+        self.collective = collective is True
 
-    def issue(self, credential, kind, *, days=None, ttl=604800, subject=None, count=1):
+    def issue(self, credential, kind, *, days=None, ttl=604800, subject=None, count=1, claim_limit=1):
         actor = self.store._owner(credential)
         if kind not in ("annual","renewal","lifetime","trial","complimentary"):
             raise BusinessDenied("invalid membership grant")
+        if type(claim_limit) is not int or not 1 <= claim_limit <= 100:
+            raise ValueError("invalid claim limit")
+        if claim_limit > 1 and (not self.collective or subject is not None or count != 1):
+            raise ValueError("collective codes require enabled support, one code and no subject binding")
         if type(count) is not int or not 1 <= count <= 100:
             raise ValueError("invalid code count")
         if ttl is not None and (type(ttl) is not int or not 1 <= ttl <= 2592000):
@@ -50,8 +55,12 @@ class ActivationCodes:
             now = self.store._now()
             for code in codes:
                 digest = self.store._digest("activation-v2", code)
-                db.execute("INSERT INTO activation_codes_v2 VALUES (?,?,?,?,?,NULL,NULL,NULL)",
-                           (digest,kind,days,None if ttl is None else now+ttl,identity))
+                if claim_limit > 1:
+                    db.execute("INSERT INTO collective_codes_v3(digest,kind,days,expires_at,claim_limit,used_count,cancelled_at) VALUES (?,?,?,?,?,0,NULL)",
+                               (digest,kind,days,None if ttl is None else now+ttl,claim_limit))
+                else:
+                    db.execute("INSERT INTO activation_codes_v2 VALUES (?,?,?,?,?,NULL,NULL,NULL)",
+                               (digest,kind,days,None if ttl is None else now+ttl,identity))
                 self.store._audit(db,actor,"issue_activation",digest.hex(),kind)
         return codes
 
@@ -65,6 +74,9 @@ class ActivationCodes:
         with self.store.transaction() as db:
             changed = db.execute("UPDATE activation_codes_v2 SET cancelled_at=? WHERE digest=? AND cancelled_at IS NULL AND redeemed_at IS NULL",
                                  (self.store._now(),digest)).rowcount == 1
+            if not changed and self.collective:
+                changed = db.execute("UPDATE collective_codes_v3 SET cancelled_at=? WHERE digest=? AND cancelled_at IS NULL AND used_count<claim_limit",
+                                     (self.store._now(),digest)).rowcount == 1
             if changed:
                 self.store._audit(db,actor,"cancel_activation",code_id,"cancelled")
             return changed
@@ -72,6 +84,8 @@ class ActivationCodes:
     def _claim(self, db, identity, account, token, now):
         digest = self.store._digest("activation-v2",token)
         row = db.execute("SELECT kind,days,expires_at,bound_identity,redeemed_at,cancelled_at FROM activation_codes_v2 WHERE digest=?",(digest,)).fetchone()
+        if row is None and self.collective:
+            return self._claim_collective(db, account, digest, now)
         if not row or row[4] is not None or row[5] is not None or (row[2] is not None and now >= row[2]) or (row[3] is not None and bytes(row[3]) != identity):
             raise MembershipDenied("activation code unavailable")
         member = grant(self.store._membership(db,account),row[0],now,days=row[1])
@@ -80,6 +94,25 @@ class ActivationCodes:
         if db.execute("UPDATE activation_codes_v2 SET redeemed_account=?,redeemed_at=? WHERE digest=? AND redeemed_at IS NULL AND cancelled_at IS NULL",
                       (account,now,digest)).rowcount != 1:
             raise MembershipDenied("activation code unavailable")
+        return member
+
+    def _claim_collective(self, db, account, digest, now):
+        # Both account and business staging stores share the same transaction lock.
+        # The conditional update and uniqueness constraint are additional defenses.
+        row = db.execute("SELECT kind,days,expires_at,claim_limit,used_count,cancelled_at FROM collective_codes_v3 WHERE digest=?", (digest,)).fetchone()
+        if not row or row[5] is not None or row[4] >= row[3] or (row[2] is not None and now >= row[2]):
+            raise MembershipDenied("activation code unavailable")
+        if db.execute("SELECT 1 FROM collective_redemptions_v3 WHERE digest=? AND account=?", (digest,account)).fetchone():
+            raise MembershipDenied("activation code unavailable")
+        previous = self.store._membership(db,account)
+        member = grant(previous,row[0],now,days=row[1])
+        if db.execute("UPDATE collective_codes_v3 SET used_count=used_count+1 WHERE digest=? AND used_count<claim_limit AND cancelled_at IS NULL",
+                      (digest,)).rowcount != 1:
+            raise MembershipDenied("activation code unavailable")
+        db.execute("INSERT INTO collective_redemptions_v3(digest,account,claimed_at,previous_expiry,new_expiry) VALUES (?,?,?,?,?)",
+                   (digest,account,now,previous.expires_at if previous else None,member.expires_at))
+        db.execute("INSERT INTO memberships_v2 VALUES (?,?,?,?) ON CONFLICT(account) DO UPDATE SET kind=excluded.kind,expires_at=excluded.expires_at,state=excluded.state",
+                   (account,member.kind,member.expires_at,member.state))
         return member
 
     def register(self, issuer, subject, device, code):
@@ -115,5 +148,12 @@ class ActivationCodes:
             raise ValueError("invalid limit")
         with self.store.transaction() as db:
             rows = db.execute("SELECT digest,kind,days,expires_at,redeemed_account,redeemed_at,cancelled_at FROM activation_codes_v2 ORDER BY expires_at DESC,digest LIMIT ?",(limit,))
-            return [{"id":bytes(r[0]).hex(),"kind":r[1],"days":r[2],"expires_at":r[3],
-                     "redeemed_account":r[4],"redeemed_at":r[5],"cancelled_at":r[6]} for r in rows]
+            result = [{"id":bytes(r[0]).hex(),"kind":r[1],"days":r[2],"expires_at":r[3],
+                       "redeemed_account":r[4],"redeemed_at":r[5],"cancelled_at":r[6]} for r in rows]
+            if self.collective:
+                collective = db.execute("SELECT digest,kind,days,expires_at,claim_limit,used_count,cancelled_at FROM collective_codes_v3 ORDER BY expires_at DESC,digest LIMIT ?",(limit,))
+                result.extend({"id":bytes(r[0]).hex(),"kind":r[1],"days":r[2],"expires_at":r[3],
+                               "claim_limit":r[4],"used_count":r[5],"cancelled_at":r[6],
+                               "redeemed_account":None,"redeemed_at":None} for r in collective)
+                result.sort(key=lambda item: (item["expires_at"] is None, item["expires_at"] or 0, item["id"]), reverse=True)
+            return result[:limit]
