@@ -86,10 +86,11 @@ internal class GuardianVerifiedUpdater(
         File(dir, "void-${release.sequence}-${release.apkSha256}.apk")
 
     suspend fun download(payload: ByteArray, signature: ByteArray, trustedNow: Long,
-                         previous: SignedGuardianPolicy.Release?, token: String): File =
+                         previous: SignedGuardianPolicy.Release?, token: String, ticket: String): File =
         withContext(Dispatchers.IO) {
             val release = policy(payload, signature, trustedNow, previous)
             require(token.length in 1..8192 && Regex("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+").matches(token))
+            require(Regex("[A-Za-z0-9_-]{43}").matches(ticket))
             check(dir.isDirectory || dir.mkdirs())
             val output = target(release)
             val connection = URL(base.toString().trimEnd('/') + "/v2/releases/${release.sequence}/apk")
@@ -102,6 +103,7 @@ internal class GuardianVerifiedUpdater(
                 connection.readTimeout = 30000
                 connection.useCaches = false
                 connection.setRequestProperty("Authorization", "Bearer $token")
+                connection.setRequestProperty("X-VOID-Release-Ticket", ticket)
                 connection.setRequestProperty("Accept", "application/vnd.android.package-archive")
                 connection.setRequestProperty("Accept-Encoding", "identity")
                 check(connection.responseCode == 200)
