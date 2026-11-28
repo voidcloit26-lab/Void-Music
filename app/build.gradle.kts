@@ -103,6 +103,13 @@ extensions.configure<ApplicationExtension> {
                 .takeIf { it.length == 64 && it.all { c -> c in '0'..'9' || c in 'a'..'f' } }
                 ?.chunked(2)?.map { it.toInt(16).toByte() }?.toByteArray() ?: ByteArray(0)
         }
+        if (stableUpdate) {
+            val pinned = System.getenv("OFFICIAL_SIGNING_CERT_SHA256") ?: ""
+            require(pinned.matches(Regex("[a-f0-9]{64}"))) { "Stable APK certificate pin required" }
+            require(expectedCertBytes.size == 32 && expectedCertBytes.joinToString("") { "%02x".format(it.toInt() and 255) } == pinned) {
+                "Release keystore does not match the permanent certificate pin"
+            }
+        }
         val storeKeyBytes = storeKey.toByteArray(Charsets.UTF_8)
         val storeGuardDir = layout.buildDirectory.dir("generated/store_guard").get().asFile
         storeGuardDir.mkdirs()
@@ -642,4 +649,13 @@ dependencies {
     androidTestImplementation(libs.junit)
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+}
+
+// A protected stable configuration must never produce a debug-signed .fast or debug APK.
+androidComponents {
+    beforeVariants(selector().all()) { variant ->
+        if (System.getenv("VOID_STABLE_UPDATE_ENABLED") == "true" && variant.buildType != "release") {
+            variant.enable = false
+        }
+    }
 }
