@@ -24,6 +24,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
     var activationAvailable by remember(client) { mutableStateOf(false) }
     var businessOpen by remember(client) { mutableStateOf(false) }
     var result by remember(client) { mutableStateOf<JSONObject?>(null) }
+    var updateState by remember(client) { mutableStateOf<GuardianStableUpdate.Check?>(null) }
+    var dismissedRelease by remember(client) { mutableStateOf<Long?>(null) }
     var linkRequired by remember(client) { mutableStateOf(false) }
     var confirmLibraryAccount by remember(client) { mutableStateOf<String?>(null) }
     var recovery by remember(client) { mutableStateOf("") }
@@ -52,6 +54,16 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             linkRequired = e is GuardianAccountClient.RequestFailed && e.status == 403
             throw e
         }
+        if (GuardianStableUpdate.enabled) {
+            val verified = GuardianStableUpdate.check(context.applicationContext, client)
+            updateState = verified.takeIf { it.decision == "required" ||
+                (it.decision == "available" && it.release.sequence != dismissedRelease) }
+            if (verified.decision == "required") {
+                lease.clear()
+                leaseVerified = false
+                GuardianV2Runtime.clear(context.applicationContext)
+            }
+        }
         if (result?.optString("status") != "active") {
             lease.clear()
             leaseVerified = false
@@ -69,7 +81,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             } catch (e: CancellationException) {
                 throw e
             } catch (e: GuardianAccountClient.RequestFailed) {
-                if (e.status == 401 || e.status == 403) {
+                if (e.status == 401 || e.status == 403 || e.status == 426) {
                     if (e.status == 401) {
                         recognizedOwner = false
                         linkRequired = false
@@ -89,6 +101,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                     403 -> "Access was not verified. Check the account or recovery code."
                     400 -> "Account request is incompatible. Refresh or contact VOID support."
                     409 -> "The account state changed. Refresh before retrying."
+                    426 -> "A verified update is required. Refresh membership to load the update screen."
                     429 -> "Too many requests. Try again later."
                     503 -> "Guardian could not verify your identity right now. Your sign-in may still be valid. Refresh before retrying. (G503)"
                     else -> "Guardian is unavailable. Refresh before retrying."
@@ -108,6 +121,8 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
             onSignOut()
             recognizedOwner = false
             businessOpen = false
+            updateState = null
+            dismissedRelease = null
             result = null
             linkRequired = false
             key = ""
@@ -127,6 +142,7 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         linkRequired = false
         onboarding = ""
         activationAvailable = false
+        updateState = null
         val identity = client.request("identity_role", emptyMap())
         recognizedOwner = identity.optString("role") == "owner"
         onboarding = identity.optString("onboarding")
@@ -148,12 +164,29 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
         run {
             refreshIdentity()
             val current = result
-            if (gateEntry && GuardianGate.v2Enforced && current?.optString("status") == "active" &&
+            if (gateEntry && GuardianGate.v2Enforced && updateState == null && current?.optString("status") == "active" &&
                 GuardianLocalLibraryOwner.status(context, current.getString("account")) == LocalLibraryBinding.Status.MATCH) {
                 check(GuardianV2Runtime.authorize(context.applicationContext, client, current.getString("account")))
                 GuardianV2Runtime.openMusic(context)
             }
         }
+    }
+
+    val pendingRelease = updateState
+    val linkedAccount = result?.optString("account")
+    if (pendingRelease != null && linkedAccount != null &&
+        Regex("[a-f0-9]{32}").matches(linkedAccount) && newRecovery == null) {
+        GuardianUpgradeScreen(pendingRelease.release, pendingRelease.installed, cloud, linkedAccount,
+            downloadAndInstall = {
+                GuardianStableUpdate.downloadAndInstall(context, client, pendingRelease)
+            },
+            onOptionalDismiss = {
+                if (pendingRelease.decision == "available") {
+                    dismissedRelease = pendingRelease.release.sequence
+                    updateState = null
+                }
+            })
+        return
     }
 
     if (businessOpen && recognizedOwner) {
