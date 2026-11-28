@@ -14,6 +14,10 @@ from guardian.activation_codes_v2 import ActivationCodes
 from guardian.clerk_profile import ClerkProfileLookup
 from guardian.owner_identity_policy import OwnerIdentityPolicy
 from guardian.owner_bootstrap import OwnerBootstrap
+from guardian.stage_release_registry import StageReleaseRegistry
+from guardian.version_gate import VersionGate
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 
 def create_app():
@@ -48,9 +52,22 @@ def create_app():
                 raise ValueError('verified activation must be enabled')
             policy = OwnerIdentityPolicy(issuer,json.loads(os.environ['VOID_V2_OWNER_IDENTITIES_JSON']))
             owner_bootstrap = OwnerBootstrap(store,policy,profile_lookup)
+        registry = version_gate = None
+        if os.environ.get('VOID_V2_STABLE_RELEASE_ENABLED') == 'true':
+            encoded = os.environ['VOID_V2_RELEASE_PUBLIC_KEY']
+            raw = base64.urlsafe_b64decode(encoded + '=' * (-len(encoded) % 4))
+            if base64.urlsafe_b64encode(raw).decode('ascii').rstrip('=') != encoded:
+                raise ValueError('noncanonical release key')
+            release_key = serialization.load_der_public_key(raw)
+            if not isinstance(release_key, ec.EllipticCurvePublicKey) or release_key.public_numbers() == key.public_key().public_numbers():
+                raise ValueError('separate release policy key required')
+            registry = StageReleaseRegistry(store, release_key)
+            if registry.current() is None:
+                raise ValueError('verified initial release required')
+            version_gate = VersionGate(registry)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
                                    activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap,
-                                   require_activation=True)
+                                   require_activation=True, release_registry=registry, version_gate=version_gate)
         fairness = SharedAccountFairness(store) if os.environ.get('VOID_V2_SHARED_FAIRNESS_ENABLED') == 'true' else AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
     except Exception:
