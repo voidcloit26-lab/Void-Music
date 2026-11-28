@@ -105,8 +105,9 @@ class ReleaseFiles:
 
 
 class ReleaseDownloadAPI:
-    def __init__(self, verifier, registry, tickets, files, fairness, reply):
+    def __init__(self, verifier, registry, tickets, files, fairness, reply, *, budget):
         self.verifier,self.registry,self.tickets,self.files,self.fairness,self.reply = verifier,registry,tickets,files,fairness,reply
+        self.budget = budget
 
     def __call__(self, env, start):
         match = re.fullmatch(r"/v2/releases/([1-9][0-9]{0,18})/apk",env.get("PATH_INFO",""))
@@ -123,8 +124,6 @@ class ReleaseDownloadAPI:
         file = None
         try:
             session = self.verifier.verify(auth[7:])
-            if not self.fairness.take((session.issuer,session.subject)):
-                return self.reply(start,"429 Too Many Requests",{"error":"retry_later"})
             sequence = int(match[1])
             release = self.registry.current()
             if release is None:
@@ -135,6 +134,10 @@ class ReleaseDownloadAPI:
             # Consume before expensive disk hashing: even a valid replay cannot
             # repeatedly hash or stream the file. A failed download needs a new ticket.
             self.tickets.consume(session,ticket,sequence)
+            # Invalid tickets cannot consume download bandwidth quotas. A valid
+            # ticket is single-use even when throttled; obtain a fresh one later.
+            if not self.fairness.take((session.issuer,session.subject)) or not self.budget.take():
+                return self.reply(start,"429 Too Many Requests",{"error":"retry_later"})
             file = self.files.open_verified(policy)
             body = _DownloadBody(file)
             start("200 OK",[("Content-Type","application/vnd.android.package-archive"),
