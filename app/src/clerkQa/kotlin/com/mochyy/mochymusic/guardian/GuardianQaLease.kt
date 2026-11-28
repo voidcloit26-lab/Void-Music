@@ -16,6 +16,7 @@ internal class GuardianQaLease(
     private val client: GuardianAccountClient,
     private val isCurrent: () -> Boolean
 ) {
+    private val app = context.applicationContext
     private val flags = Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
     private val key = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(
         decode("MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQd2EkFTXZBKBZW0S2HRm2kVFUFUjS9KmxUHDa1c8RktpEJ-gcHU33Z5UmiXk5p2pVi-R1tZI4NpuEGBOV3z8Cw", 256)
@@ -35,7 +36,7 @@ internal class GuardianQaLease(
         check(!closed && isCurrent())
         cache.clear()
         val anchor = cache.anchor()
-        val response = client.request("lease", emptyMap())
+        val response = GuardianStableUpdate.lease(app, client)
         check(response.keys().asSequence().toSet() == setOf("payload", "signature"))
         val payload = decode(response.getString("payload"), 4096)
         val signature = decode(response.getString("signature"), 128)
