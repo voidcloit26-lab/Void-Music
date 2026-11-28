@@ -240,18 +240,26 @@ class AccountProtocol:
         if action == "rotate_recovery":
             return {"recovery": self.store.rotate_linked_recovery(session.issuer, session.subject, fingerprint)}
         if action in ("lease", "lease_versioned"):
+            release_policy = None
             if action == "lease" and self.version_gate is not None:
                 raise UpdateRequired("legacy lease protocol disabled")
             if action == "lease_versioned":
                 if self.version_gate is None:
                     raise MembershipDenied("versioned leases disabled")
-                self.version_gate.require_supported(body["version_code"], body["signer_sha256"])
+                release_policy = self.version_gate.require_supported(body["version_code"], body["signer_sha256"])
             if self.lease_key is None:
                 raise MembershipDenied("lease issuance disabled")
             member = self.store.membership(account, fingerprint)
             if member is None:
                 raise MembershipDenied("inactive")
-            payload, signature = issue_lease(member, account, fingerprint, self.store._now(), self.lease_key)
+            now = self.store._now()
+            max_seconds = 86400
+            if release_policy is not None:
+                max_seconds = min(max_seconds, release_policy.expires_at - now)
+                if max_seconds <= 0:
+                    raise DownloadUnavailable("release policy expired")
+            payload, signature = issue_lease(member, account, fingerprint, now, self.lease_key,
+                                             max_seconds=max_seconds)
             return {"payload": b64(payload), "signature": b64(signature)}
         if action == "status":
             member = self.store.membership(account, fingerprint)
