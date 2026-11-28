@@ -48,6 +48,17 @@ class SharedIdentityBudgetTests(unittest.TestCase):
         self.assertRegex(row[0], r"^[a-f0-9]{64}$")
         self.assertNotIn("user_a", row[0])
 
+    def test_download_scope_separate(self):
+        identity = ("https://example.test", "user_a")
+        account = self.open(limit=1)
+        download = SharedAccountFairness(self.store, limit=1, capacity=2, clock=lambda: self.now, scope='release-download')
+        self.assertTrue(account.take(identity))
+        self.assertFalse(account.take(identity))
+        self.assertTrue(download.take(identity))
+        self.assertFalse(download.take(identity))
+        with self.assertRaises(ValueError):
+            SharedAccountFairness(self.store, scope="untrusted")
+
     def test_storage_error_is_unavailable(self):
         class Broken:
             def take(self, identity):
