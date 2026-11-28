@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 /** Native VOID landing. Clerk remains the authority for every authentication
  * factor; a returned OAuth response never grants Guardian playback access. */
 @Composable
-internal fun GuardianLoginLanding(onEmail: () -> Unit) {
+internal fun GuardianLoginLanding(onEmail: () -> Unit, onSignup: () -> Unit) {
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
@@ -67,9 +67,13 @@ internal fun GuardianLoginLanding(onEmail: () -> Unit) {
         }
         OutlinedButton(onClick = onEmail, enabled = !busy,
             modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoundedCornerShape(18.dp)) {
-            Text("Continue with email")
+            Text("Sign in with email")
         }
-        Text("New accounts and existing members use the same secure sign-in.",
+        OutlinedButton(onClick = onSignup, enabled = !busy,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp), shape = RoundedCornerShape(18.dp)) {
+            Text("Create an account")
+        }
+        Text("New members need an activation code. Existing members can sign in directly.",
             modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.56f))
