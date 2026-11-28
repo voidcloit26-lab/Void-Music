@@ -208,11 +208,8 @@ internal class GuardianQaCloud(
             return null
         }
         require(revision in 1 until Long.MAX_VALUE)
-        val body = remoteBody(remote)
-        val digest = CloudMetadata.parse(body).digest()
-        val favorites = (body["favorites"] as List<*>).size
-        val playlists = (body["playlists"] as List<*>).size
-        return ClearPreview(account, revision, digest, favorites, playlists)
+        val snapshot = CloudRemoteData.inspect(revision, remoteBody(remote))
+        return ClearPreview(account, revision, snapshot.digest, snapshot.favorites, snapshot.playlists)
     }
 
     suspend fun confirmClear(approved: ClearPreview, confirmed: Boolean): Long {
@@ -231,10 +228,7 @@ internal class GuardianQaCloud(
         check(isCurrent())
         val revision = remote.getLong("revision")
         check(revision > 0L && !remote.isNull("library"))
-        val body = remoteBody(remote)
-        CloudMetadata.parse(body)
-        return AccountProofV2.canonicalBody("cloud_write", mapOf("revision" to revision, "library" to body))
-            .toByteArray(Charsets.UTF_8)
+        return CloudRemoteData.inspect(revision, remoteBody(remote)).json.toByteArray(Charsets.UTF_8)
     }
 
     suspend fun writeRemoteExport(account: String, destination: android.net.Uri) {
