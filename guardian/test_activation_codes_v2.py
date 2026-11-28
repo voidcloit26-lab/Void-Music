@@ -154,4 +154,22 @@ class ActivationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.codes.issue("owner-test", "annual", **({"claim_limit":2} | args))
 
+    def test_owner_claim_history_includes_single_and_collective(self):
+        self.enable_collective()
+        account, _, _ = self.register(self.issue("annual"))
+        self.now += 1
+        shared = self.issue("renewal", claim_limit=2)
+        self.codes.redeem(self.issuer,"user_first","a"*64,shared)
+        history = self.codes.history("owner-test",account)
+        self.assertEqual(history["total_claims"],2)
+        self.assertEqual(history["renewals"],1)
+        self.assertEqual([event["claim_number"] for event in history["events"]],[2,1])
+        self.assertTrue(history["events"][0]["collective"])
+        self.assertFalse(history["events"][1]["collective"])
+        self.assertNotIn(shared,str(history))
+        with self.assertRaises(BusinessDenied):
+            self.codes.history("member",account)
+        with self.assertRaises(MembershipDenied):
+            self.codes.history("owner-test","f"*32)
+
 if __name__=="__main__": unittest.main()
