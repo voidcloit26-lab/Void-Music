@@ -105,3 +105,34 @@ class ProtocolTests(unittest.TestCase):
         self.store.set_state(self.account,"suspended")
         with self.assertRaises(MembershipDenied):
             self.call("lease",{})
+
+    def test_profile_verified_email_and_redemption_counts(self):
+        from guardian.activation_codes_v2 import ActivationCodes, DDL
+        self.api.activation_codes = ActivationCodes(self.store)
+        self.api.profile_lookup = lambda subject: {
+            "id": subject, "primary_email_address_id": "id_1",
+            "email_addresses": [{"id": "id_1", "email_address": "member@example.com",
+                                 "verification": {"status": "verified"}}]}
+        with self.store.transaction() as db:
+            db.execute(DDL)
+            for i, kind in enumerate(("annual", "renewal", "renewal")):
+                db.execute("INSERT INTO activation_codes_v2 VALUES (?,?,NULL,NULL,NULL,?,?,NULL)",
+                           (bytes([i])*32, kind, self.account, 1800000000+i))
+        self.assertEqual(self.call("profile", {}), {
+            "account": self.account, "email": "member@example.com", "total_claims": 3, "renewals": 2})
+        with self.assertRaises(MembershipDenied):
+            self.api.challenge("a", self.other_pub, "profile", {})
+        with self.assertRaises(MembershipDenied):
+            self.api.challenge("b", self.pub, "profile", {})
+
+    def test_profile_requires_verified_email_and_enabled_activation(self):
+        from guardian.activation_codes_v2 import ActivationCodes
+        with self.assertRaises(MembershipDenied):
+            self.call("profile", {})
+        self.api.activation_codes = ActivationCodes(self.store)
+        self.api.profile_lookup = lambda subject: {
+            "id": subject, "primary_email_address_id": "id_1",
+            "email_addresses": [{"id": "id_1", "email_address": "member@example.com",
+                                 "verification": {"status": "unverified"}}]}
+        with self.assertRaises(SessionDenied):
+            self.call("profile", {})
