@@ -35,6 +35,11 @@ object TransferRestore {
     fun applyPending(app: Application) {
         // the crash screen runs in its own process and must never touch an import
         if (!isMainProcess(app)) return
+        // An archive can replace the entire database, preferences and downloads.
+        // It is not an account-bound restore. Never apply it before Guardian
+        // authorization in a protected installation, including a staged legacy import.
+        // Retain staging untouched so an upgrade cannot silently discard user data.
+        if (com.mochyy.mochymusic.BuildConfig.VOID_GUARDIAN_V2_ENFORCED) return
         val staging = stagingDir(app)
         if (!staging.exists()) return
         val ready = File(staging, ReadyMarker)
