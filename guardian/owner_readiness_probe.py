@@ -17,5 +17,5 @@ def check_owner_profile(policy, profile_lookup):
     except Exception as exc:
         logger.warning("Owner profile readiness: denied (%s)", type(exc).__name__)
         return False
-    logger.info("Owner profile readiness: verified")
+    logger.warning("Owner profile readiness: verified")
     return True
