@@ -2,9 +2,11 @@ import tempfile
 import unittest
 from pathlib import Path
 import hashlib
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
 from guardian.clerk_session import VerifiedSession
 from guardian.membership_rules import MembershipDenied
-from guardian.release_download import DownloadTickets, ReleaseFiles, DownloadUnavailable
+from guardian.release_download import DownloadTickets, ReleaseFiles, DownloadUnavailable, ReleaseDownloadAPI
 from guardian.release_policy import ReleasePolicy
 from guardian.external_identity_store import ExternalIdentityStore
 
@@ -66,6 +68,52 @@ class DownloadTests(unittest.TestCase):
             self.tickets.consume(self.a,token,1)
         with self.assertRaises(MembershipDenied):
             self.issue()
+
+    def test_download_api_charges_only_valid_tickets(self):
+        key = ec.generate_private_key(ec.SECP256R1())
+        payload = self.policy.canonical()
+        signature = key.sign(payload, ec.ECDSA(hashes.SHA256()))
+        session = self.a
+        class Verifier:
+            def verify(self, token):
+                return session
+        class Registry:
+            public_key = key.public_key()
+            def clock(self):
+                return 1800000000
+            def current(self):
+                return payload, signature
+        class Quota:
+            def __init__(self, allowed=True):
+                self.calls, self.allowed = 0, allowed
+            def take(self, *args):
+                self.calls += 1
+                return self.allowed
+        fairness, budget = Quota(), Quota(False)
+        def reply(start, status, value):
+            start(status, [])
+            return [b"error"]
+        api = ReleaseDownloadAPI(Verifier(), Registry(), self.tickets, self.files, fairness, reply, budget=budget)
+        def request(ticket):
+            statuses = []
+            env = {"PATH_INFO":"/v2/releases/1/apk","REQUEST_METHOD":"GET",
+                   "HTTP_AUTHORIZATION":"Bearer a","HTTP_X_VOID_RELEASE_TICKET":ticket}
+            response = api(env, lambda status, headers: statuses.append(status))
+            try:
+                body = b"".join(response)
+            finally:
+                if hasattr(response,"close"):
+                    response.close()
+            return statuses[0],body
+        self.assertEqual(request("x"*43)[0], "403 Forbidden")
+        self.assertEqual((fairness.calls,budget.calls),(0,0))
+        ticket = self.issue()
+        self.assertEqual(request(ticket)[0],"429 Too Many Requests")
+        self.assertEqual((fairness.calls,budget.calls),(1,1))
+        self.assertEqual(request(ticket)[0],"403 Forbidden")
+        budget.allowed = True
+        self.assertEqual(request(self.issue()),("200 OK",self.data))
+        self.assertEqual((fairness.calls,budget.calls),(2,2))
 
     def test_verified_file(self):
         with self.files.open_verified(self.policy) as f:
