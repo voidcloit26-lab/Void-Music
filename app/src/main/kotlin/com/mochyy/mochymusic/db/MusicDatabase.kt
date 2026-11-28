@@ -76,6 +76,10 @@ class MusicDatabase(
     val openHelper: SupportSQLiteOpenHelper
         get() = delegate.openHelper
 
+    /** Observe committed local library changes; no network or cloud dependency. */
+    fun libraryChanges(): kotlinx.coroutines.flow.Flow<Set<String>> =
+        delegate.invalidationTracker.createFlow("song", "playlist", "playlist_song_map", emitInitialState = false)
+
     fun query(block: MusicDatabase.() -> Unit) =
         with(delegate) {
             queryExecutor.execute {
