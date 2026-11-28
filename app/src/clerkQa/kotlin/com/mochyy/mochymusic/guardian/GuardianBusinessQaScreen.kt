@@ -25,6 +25,8 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
     var summary by remember { mutableStateOf<JSONObject?>(null) }
     var kind by remember { mutableStateOf("lifetime") }
     var count by remember { mutableStateOf("1") }
+    var collective by remember { mutableStateOf(false) }
+    var claimLimit by remember { mutableStateOf("10") }
     var days by remember { mutableStateOf("30") }
     var ttl by remember { mutableStateOf("7") }
     var codes by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -67,30 +69,40 @@ internal fun GuardianBusinessQaScreen(client: GuardianBusinessQaClient, back: ()
                     Text(option.replaceFirstChar { it.uppercase() },Modifier.padding(top=12.dp))
                 }
             }
-            OutlinedTextField(count,{count=it.filter(Char::isDigit).take(3)},label={Text("Number of codes (1–100)")},singleLine=true)
+            Row {
+                Checkbox(checked=collective, onCheckedChange={collective=it}, enabled=!busy)
+                Text("One shared code for multiple accounts")
+            }
+            if (collective) OutlinedTextField(claimLimit,{claimLimit=it.filter(Char::isDigit).take(3)},label={Text("Maximum accounts (2–100)")},singleLine=true)
+            else OutlinedTextField(count,{count=it.filter(Char::isDigit).take(3)},label={Text("Number of single-use codes (1–100)")},singleLine=true)
             if (kind in listOf("trial","complimentary")) OutlinedTextField(days,{days=it.filter(Char::isDigit).take(3)},label={Text("Membership duration in days")},singleLine=true)
             OutlinedTextField(ttl,{ttl=it.filter(Char::isDigit).take(2)},label={Text("Redemption deadline days (0 = no expiry)")},singleLine=true)
             Button(onClick={
-                val data=JSONObject().put("kind",kind).put("count",count.toInt()).put("ttl",if(ttl.toInt()==0) JSONObject.NULL else ttl.toInt()*86400)
+                val data=JSONObject().put("kind",kind).put("count",if(collective) 1 else count.toInt()).put("ttl",if(ttl.toInt()==0) JSONObject.NULL else ttl.toInt()*86400)
+                if(collective) data.put("claim_limit",claimLimit.toInt())
                 if(kind in listOf("trial","complimentary")) data.put("days",days.toInt())
                 run {
                     codes=emptyList()
                     val response=client.request("codes/create",data).getJSONArray("codes")
                     codes=List(response.length()){response.getString(it)}
                 }
-            },enabled=!busy && codes.isEmpty() && (count.toIntOrNull() ?: -1) in 1..100 && (ttl.toIntOrNull() ?: -1) in 0..30 &&
+            },enabled=!busy && codes.isEmpty() && (if(collective) (claimLimit.toIntOrNull() ?: -1) in 2..100 else (count.toIntOrNull() ?: -1) in 1..100) && (ttl.toIntOrNull() ?: -1) in 0..30 &&
                 (kind !in listOf("trial","complimentary") || (days.toIntOrNull() ?: -1) in 1..365)) { Text("Generate codes") }
             OutlinedButton(onClick={run { list=client.request("codes/list").getJSONArray("codes") }},enabled=!busy) {Text("View activation history")}
             list?.let { rows ->
                 for(i in 0 until rows.length()) {
                     val item=rows.getJSONObject(i)
+                    val limit=item.optInt("claim_limit",1)
+                    val used=item.optInt("used_count",if(item.isNull("redeemed_at")) 0 else 1)
+                    val expired=!item.isNull("expires_at") && item.optLong("expires_at") <= System.currentTimeMillis()/1000L
                     Text(item.optString("kind")+" · "+when{
-                        !item.isNull("redeemed_at")->"Redeemed"
                         !item.isNull("cancelled_at")->"Cancelled"
-                        else->"Issued"
-                    })
-                    if(item.isNull("redeemed_at") && item.isNull("cancelled_at")) {
-                        TextButton(onClick={confirmation="code:"+item.getString("id")},enabled=!busy){Text("Cancel unused code")}
+                        used>=limit->"Fully claimed"
+                        expired->"Expired"
+                        else->"Available"
+                    }+" · "+used+"/"+limit+" claimed")
+                    if(used<limit && !expired && item.isNull("cancelled_at")) {
+                        TextButton(onClick={confirmation="code:"+item.getString("id")},enabled=!busy){Text("Cancel remaining claims")}
                     }
                 }
             }
