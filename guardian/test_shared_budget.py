@@ -45,6 +45,12 @@ class SharedBudgetTests(unittest.TestCase):
         self.assertFalse(self.open(limit=1).take())
         self.assertTrue(self.open('owner',1).take())
 
+    def test_independent_download_budget(self):
+        self.assertTrue(self.open('release-download',1).take())
+        self.assertFalse(self.open('release-download',1).take())
+        self.assertTrue(self.open('account',1).take())
+        self.assertTrue(self.open('owner',1).take())
+
     def test_invalid_config(self):
         for bucket,limit in [('user-input',1),('account',True),('account',0)]:
             with self.assertRaises(ValueError):
