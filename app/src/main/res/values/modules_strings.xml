@@ -288,4 +288,13 @@
     <string name="skin_surface_btn_use">USE</string>
     <string name="skin_surface_btn_enter">OK</string>
     <string name="skin_surface_btn_slot">S%1$d</string>
+    <!-- Default fallbacks for existing localized resources. -->
+    <string name="modules_bar">Discover compatible modules</string>
+    <string name="module_browser_title">Module browser</string>
+    <string name="module_browser_subtitle">Third-party modules are unofficial</string>
+    <string name="module_browser_looks">Appearance</string>
+    <string name="module_browser_players">Players</string>
+    <string name="module_browser_sources">Sources</string>
+    <string name="module_browser_paid">Paid module</string>
+    <string name="module_browser_others">Others</string>
 </resources>
