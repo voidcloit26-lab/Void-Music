@@ -44,6 +44,7 @@ ACTIONS = {
     "lease": set(),
     "lease_versioned": {"version_code", "signer_sha256"},
     "status": set(),
+    "profile": set(),
     "redeem_free": {"code"},
     "cloud_read": set(),
     "cloud_write": {"revision", "library"},
@@ -261,6 +262,18 @@ class AccountProtocol:
             payload, signature = issue_lease(member, account, fingerprint, now, self.lease_key,
                                              max_seconds=max_seconds)
             return {"payload": b64(payload), "signature": b64(signature)}
+        if action == "profile":
+            if self.profile_lookup is None or self.activation_codes is None:
+                raise MembershipDenied("profile unavailable")
+            email = verified_primary_email(session.subject, self.profile_lookup(session.subject))
+            with self.store.transaction() as db:
+                self.store._require_device(db, account, self.store._device(fingerprint))
+                rows = db.execute(
+                    "SELECT kind, COUNT(*) FROM activation_codes_v2 WHERE redeemed_account=? AND redeemed_at IS NOT NULL GROUP BY kind",
+                    (account,)).fetchall()
+            counts = {kind: int(count) for kind, count in rows}
+            return {"account": account, "email": email, "total_claims": sum(counts.values()),
+                    "renewals": counts.get("renewal", 0)}
         if action == "status":
             member = self.store.membership(account, fingerprint)
             now = self.store._now()
