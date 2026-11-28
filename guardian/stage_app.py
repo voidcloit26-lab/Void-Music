@@ -86,9 +86,15 @@ def create_app():
                 pass
             tickets = DownloadTickets(store)
             version_gate = VersionGate(registry)
+        extended_library = None
+        if os.environ.get('VOID_V4_EXTENDED_LIBRARY_ENABLED') == 'true':
+            from guardian.extended_library_v4 import ExtendedLibraryStore, verify_stage
+            verify_stage(store)
+            extended_library = ExtendedLibraryStore(store)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
                                    activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap,
-                                   require_activation=True, release_registry=registry, version_gate=version_gate, download_tickets=tickets)
+                                   require_activation=True, release_registry=registry, version_gate=version_gate, download_tickets=tickets,
+                                   extended_library=extended_library)
         fairness = SharedAccountFairness(store) if os.environ.get('VOID_V2_SHARED_FAIRNESS_ENABLED') == 'true' else AccountFairness()
         api = AccountAPI(protocol, sandbox=True, budget=SharedBudget(store, bucket='account'))
         if tickets is not None:
