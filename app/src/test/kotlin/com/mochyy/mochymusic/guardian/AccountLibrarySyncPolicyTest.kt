@@ -7,14 +7,17 @@ class AccountLibrarySyncPolicyTest {
     private val old = "a".repeat(64)
     private val next = "b".repeat(64)
     private val baseline = CloudSyncPolicy.Baseline("c".repeat(32), 8, old)
-    private fun decide(revision: Long, remote: String, local: String, excluded: Int = 0) =
-        AccountLibrarySyncPolicy.decide(baseline, revision, remote, local, excluded)
+    private fun decide(revision: Long, remote: String, local: String, excluded: Int = 0, additive: Boolean = true) =
+        AccountLibrarySyncPolicy.decide(baseline, revision, remote, local, excluded, additive)
 
     @Test fun unchangedIsCurrent() {
         assertEquals(AccountLibrarySyncPolicy.Action.CURRENT, decide(8, old, old))
     }
     @Test fun knownRevisionPermitsLocalEdit() {
         assertEquals(AccountLibrarySyncPolicy.Action.UPLOAD, decide(8, old, next))
+    }
+    @Test fun destructiveSnapshotRequiresReview() {
+        assertEquals(AccountLibrarySyncPolicy.Action.REVIEW, decide(8, old, next, additive = false))
     }
     @Test fun incompleteSnapshotNeverUploads() {
         assertEquals(AccountLibrarySyncPolicy.Action.REVIEW, decide(8, old, next, 1))
