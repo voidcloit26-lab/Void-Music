@@ -13,7 +13,7 @@ DDL = """CREATE TABLE IF NOT EXISTS request_budget_v2 (
 
 class SharedBudget:
     def __init__(self, store, *, bucket, limit=120, clock=time.time):
-        if bucket not in ('account', 'owner'):
+        if bucket not in ('account', 'owner', 'release-download'):
             raise ValueError('invalid budget bucket')
         if type(limit) is not int or not 1 <= limit <= 10000:
             raise ValueError('invalid budget capacity')
@@ -23,7 +23,7 @@ class SharedBudget:
 
     def take(self):
         # Fail closed on DB errors or backward wall-clock movement. The shared
-        # store serializes these transactions across workers. At most two rows.
+        # store serializes these transactions across workers. At most three rows.
         with self.store.transaction() as db:
             now = int(self.clock())
             if now <= 0:
