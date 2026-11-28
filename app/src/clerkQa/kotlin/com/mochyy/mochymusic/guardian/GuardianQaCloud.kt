@@ -22,7 +22,8 @@ internal class GuardianQaCloud(
     private val ownsLibrary: (String) -> Boolean,
     private val isCurrent: () -> Boolean
 ) : GuardianAutomaticSync.Port {
-    private val settings = context.applicationContext.dataStore
+    private val app = context.applicationContext
+    private val settings = app.dataStore
     data class UpgradeBackup(val account: String, val revision: Long, val snapshot: GuardianCloudSnapshot.Preview)
     data class UpgradeReceipt(val revision: Long, val recovery: String)
 
@@ -224,7 +225,7 @@ internal class GuardianQaCloud(
 
     /** Export only the authenticated remote snapshot; no recovery material,
      * device identity, OAuth credentials or local paths. */
-    suspend fun exportRemote(account: String): ByteArray {
+    private suspend fun exportRemote(account: String): ByteArray {
         requireRemoteAccount(account)
         val remote = client.request("cloud_read", emptyMap())
         check(isCurrent())
@@ -234,6 +235,20 @@ internal class GuardianQaCloud(
         CloudMetadata.parse(body)
         return AccountProofV2.canonicalBody("cloud_write", mapOf("revision" to revision, "library" to body))
             .toByteArray(Charsets.UTF_8)
+    }
+
+    suspend fun writeRemoteExport(account: String, destination: android.net.Uri) {
+        require(destination.scheme == "content")
+        val bytes = exportRemote(account)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            check(isCurrent()) { "Account changed" }
+            val stream = requireNotNull(app.contentResolver.openOutputStream(destination, "w"))
+            stream.use {
+                check(isCurrent()) { "Account changed" }
+                it.write(bytes)
+                it.flush()
+            }
+        }
     }
 
     data class PreferencePreview(val account: String, val revision: Long, val digest: String,
