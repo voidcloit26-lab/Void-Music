@@ -275,20 +275,26 @@ internal class GuardianQaCloud(
         require(revision in 1 until Long.MAX_VALUE && !remote.isNull("library"))
         val body = remoteBody(remote)
         val local = GuardianCloudSnapshot.capture(database, preferences = prefsOf(body))
-        val evaluation = CloudSyncEvaluation.evaluate(account, true, baseline, revision, body,
-            local.body, local.excludedEntries)
+        // A previously acknowledged exact snapshot and explicit consent permit
+        // local edits (including unlikes and playlist edits) to become the new
+        // cloud revision. An incomplete snapshot or remote divergence never wins.
+        val remoteDigest = CloudMetadata.parse(body).digest()
+        val localDigest = CloudMetadata.parse(local.body).digest()
         check(isCurrent() && ownsLibrary(account))
-        return when (evaluation.action) {
-            CloudSyncPolicy.Action.CURRENT -> baseline
-            CloudSyncPolicy.Action.UPLOAD -> {
-                // Reject a concurrent local mutation before issuing a single CAS write.
+        return when (AccountLibrarySyncPolicy.decide(baseline, revision, remoteDigest,
+            localDigest, local.excludedEntries)) {
+            AccountLibrarySyncPolicy.Action.CURRENT -> baseline
+            AccountLibrarySyncPolicy.Action.ALREADY_SAVED ->
+                CloudSyncPolicy.Baseline(account, revision, remoteDigest)
+            AccountLibrarySyncPolicy.Action.UPLOAD -> {
                 check(GuardianCloudSnapshot.capture(database, preferences = prefsOf(body)) == local)
                 check(isCurrent() && ownsLibrary(account))
                 val response = client.request("cloud_write", mapOf("revision" to revision, "library" to local.body))
                 check(isCurrent() && ownsLibrary(account))
-                CloudSyncEvaluation.confirmed(account, evaluation, response.getLong("revision"))
+                check(response.getLong("revision") == revision + 1)
+                CloudSyncPolicy.Baseline(account, revision + 1, localDigest)
             }
-            else -> error("Library changed; manual review required")
+            AccountLibrarySyncPolicy.Action.REVIEW -> error("Library changed; manual review required")
         }
     }
 }
