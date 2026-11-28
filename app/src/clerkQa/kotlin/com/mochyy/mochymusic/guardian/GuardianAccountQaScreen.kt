@@ -324,6 +324,19 @@ internal fun GuardianAccountQaScreen(client: GuardianAccountClient, lease: Guard
                 }
             }
             if (status == "active" && libraryMatches && !gateEntry) {
+                val database = (context.applicationContext as com.mochyy.mochymusic.App).musicDatabase
+                val favorites by remember(database, accountId) { database.likedSongsCount() }.collectAsState(initial = 0)
+                val playlists by remember(database, accountId) { database.accountLocalPlaylistCount() }.collectAsState(initial = 0)
+                val downloads by remember(database, accountId) { database.accountLocalDownloadCount() }.collectAsState(initial = 0)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Liked songs" to favorites, "Playlists" to playlists, "Downloads" to downloads).forEach { (label, total) ->
+                        Column(Modifier.weight(1f), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                            Text(total.toString(), style = MaterialTheme.typography.titleLarge)
+                            Text(label, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
                 OutlinedButton(onClick = { confirmCloudRestore = accountId },
                     enabled = !busy && newRecovery == null, modifier = Modifier.fillMaxWidth()) {
                     Text("Restore my saved library")
