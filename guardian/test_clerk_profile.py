@@ -46,6 +46,20 @@ class ProfileTests(unittest.TestCase):
             self.assertNotIn("198.51.100.7", logs.output[0])
             self.assertNotIn("private", logs.output[0])
 
+    def test_documented_headers_and_html_error_redaction(self):
+        lookup = ClerkProfileLookup("sk_test_synthetic")
+        rejected = HTTPError("https://example.test", 403, "denied", {}, io.BytesIO(b"<html>private response</html>"))
+        with patch.object(lookup._opener, "open", side_effect=rejected) as opened:
+            with self.assertLogs("guardian.clerk_profile", level="WARNING") as logs:
+                with self.assertRaises(ProfileUnavailable):
+                    lookup("user_test")
+            request = opened.call_args.args[0]
+            self.assertEqual(request.get_header("Clerk-api-version"), "2026-08-20")
+            self.assertEqual(request.get_header("User-agent"), "VOID-Guardian/2.0")
+            self.assertIn("response_kind=html", logs.output[0])
+            self.assertNotIn("private response", logs.output[0])
+            self.assertNotIn("user_test", logs.output[0])
+
     def test_network_error_is_not_user_signout(self):
         lookup = ClerkProfileLookup("sk_test_synthetic")
         with patch.object(lookup._opener, "open", side_effect=URLError("private test URL")):
