@@ -13,6 +13,8 @@ internal object AccountProofV2 {
         "status" to emptySet(), "profile" to emptySet(), "redeem_free" to setOf("code"),
         "cloud_read" to emptySet(), "cloud_write" to setOf("revision", "library"),
         "cloud_clear" to setOf("revision"), "release_policy" to emptySet(),
+        "extended_read" to emptySet(), "extended_write" to setOf("revision", "library"),
+        "extended_clear" to setOf("revision"), "extended_history_clear" to setOf("revision"),
         "backup_for_upgrade" to setOf("revision", "library"),
         "release_download" to setOf("sequence")
     )
