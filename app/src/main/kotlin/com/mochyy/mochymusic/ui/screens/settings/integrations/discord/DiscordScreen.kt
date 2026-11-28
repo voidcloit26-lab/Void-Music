@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,8 +46,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.navigation.NavController
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
 import com.mochyy.mochymusic.R
@@ -59,7 +60,6 @@ import com.mochyy.mochymusic.discord.PresenceSettings
 import com.mochyy.mochymusic.ui.component.SubSettingsScaffold
 import com.mochyy.mochymusic.ui.screens.settings.integrations.IntegrationPageSubtitle
 import com.mochyy.mochymusic.viewmodels.DiscordViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 
@@ -94,22 +94,17 @@ fun DiscordScreen(
             viewModel.dismissProblem()
         }
     }
-    // back from the browser without an answer, give the redirect a moment to land before the button goes back to log in
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        scope.launch {
-            delay(1_500)
-            viewModel.cancelWaiting()
-        }
-    }
 
     fun openLogin() {
         scope.launch {
-            val uri = viewModel.loginUri()
             try {
+                val uri = viewModel.loginUri()
                 context.startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (e: android.content.ActivityNotFoundException) {
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
                 viewModel.cancelWaiting()
-                Toast.makeText(context, context.getString(R.string.discord_no_browser_toast), Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Could not open Discord profile linking. Try again.", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -172,15 +167,40 @@ fun DiscordScreen(
                 DiscordNoticeCard("Custom activity buttons may be hidden on your own profile. Ask another Discord user to check your activity.")
             }
             Spacer(Modifier.height(12.dp))
+            DiscordSectionTitle("Discord profile")
+            DiscordNoticeCard(
+                "Optional: link your Discord profile to display your name and avatar here. " +
+                    "Listening activity works without linking. Choose the same account as in the official Discord app."
+            )
+            Spacer(Modifier.height(8.dp))
+            when {
+                !viewModel.isConfigured -> DiscordNoticeCard("Profile linking is unavailable in this build.")
+                login == DiscordLogin.Finishing -> Text("Loading Discord profile…", color = DiscordColors.Secondary)
+                login == DiscordLogin.InBrowser -> OutlinedButton(
+                    onClick = viewModel::cancelWaiting, modifier = Modifier.fillMaxWidth()
+                ) { Text("Cancel profile linking") }
+                profile == null -> Button(onClick = ::openLogin, modifier = Modifier.fillMaxWidth()) {
+                    Text("Link Discord profile")
+                }
+                else -> {
+                    OutlinedButton(onClick = ::openLogin, modifier = Modifier.fillMaxWidth()) {
+                        Text("Refresh or switch Discord profile")
+                    }
+                    TextButton(onClick = viewModel::logOut, modifier = Modifier.fillMaxWidth()) {
+                        Text("Unlink profile")
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
             DiscordProfileCard(
-                profile = null,
-                nativePreview = true,
+                profile = profile,
+                nativePreview = profile == null,
                 track = track,
                 settings = settings,
                 modifier = Modifier.onGloballyPositioned { previewBottomPx = it.boundsInWindow().bottom },
             )
             Spacer(Modifier.height(12.dp))
-            DiscordNoticeCard("No Discord token or password is required. Unsupported animated artwork uses a public still image or the VOID logo.")
+            DiscordNoticeCard("Profile linking uses Discord's official authorization page; no password or token is entered in VOID Music. Profile details stay in memory until the app restarts. Unsupported animated artwork uses a public still image or the VOID logo.")
             CustomizeSection(
                 settings = settings,
                 edit = viewModel::edit,
