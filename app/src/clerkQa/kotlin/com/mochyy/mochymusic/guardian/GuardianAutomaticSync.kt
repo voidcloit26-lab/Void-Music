@@ -5,6 +5,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,11 +38,13 @@ internal object GuardianAutomaticSync {
     private var generation = 0L
     private var configuration: Configuration? = null
     private var job: Job? = null
+    private var changeObserver: Job? = null
 
     suspend fun enable(account: String, cloud: Port, stillCurrent: () -> Boolean,
                        resume: CloudSyncPolicy.Baseline? = null,
                        onBaseline: (CloudSyncPolicy.Baseline) -> Unit = {},
-                       onReview: () -> Unit = {}): Boolean =
+                       onReview: () -> Unit = {},
+                       changes: Flow<Set<String>>? = null): Boolean =
         withContext(Dispatchers.IO) {
             val started = synchronized(lock) {
                 check(configuration == null && job?.isCompleted != false)
@@ -53,6 +59,16 @@ internal object GuardianAutomaticSync {
                 onBaseline(baseline)
                 configuration = Configuration(account, cloud, baseline, stillCurrent, onBaseline, onReview)
                 state.value = Status.ENABLED
+                changeObserver?.cancel()
+                changeObserver = changes?.let { source ->
+                    scope.launch {
+                        source.conflate().collect {
+                            // Coalesce Room invalidations and avoid exhausting the API budget.
+                            delay(60_000)
+                            if (stillCurrent()) schedule(account)
+                        }
+                    }
+                }
                 true
             }
         }
@@ -62,13 +78,15 @@ internal object GuardianAutomaticSync {
             generation++
             configuration = null
             job?.cancel()
+            changeObserver?.cancel()
+            changeObserver = null
             // A cancelled blocking transport may still be unwinding. Retain its job
             // until completion so a subsequent session cannot overlap it.
             state.value = Status.DISABLED
         }
     }
 
-    /** Called only from the existing successful online membership refresh. */
+    /** Called by verified membership refresh and coalesced local changes. */
     fun schedule(account: String) {
         synchronized(lock) {
             val selected = configuration ?: return
@@ -87,6 +105,8 @@ internal object GuardianAutomaticSync {
                                 state.value = Status.ENABLED
                             } else {
                                 configuration = null
+                                changeObserver?.cancel()
+                                changeObserver = null
                                 state.value = Status.DISABLED
                             }
                         }
@@ -104,6 +124,8 @@ internal object GuardianAutomaticSync {
                                 state.value = Status.ENABLED
                             } else {
                                 configuration = null
+                                changeObserver?.cancel()
+                                changeObserver = null
                                 runCatching { selected.onReview() }
                                 state.value = Status.REVIEW_REQUIRED
                             }
