@@ -48,6 +48,9 @@ def create_app():
                 raise ValueError('verified activation must be enabled')
             policy = OwnerIdentityPolicy(issuer,json.loads(os.environ['VOID_V2_OWNER_IDENTITIES_JSON']))
             owner_bootstrap = OwnerBootstrap(store,policy,profile_lookup)
+        if os.environ.get('VOID_V2_OWNER_PROFILE_PROBE') == 'true' and owner_bootstrap is not None:
+            from guardian.owner_readiness_probe import check_owner_profile
+            check_owner_profile(policy, profile_lookup)
         protocol = AccountProtocol(store, verifier, lease_key=key, challenges=DurableChallenges(store),
                                    activation_codes=activation_codes, profile_lookup=profile_lookup, owner_bootstrap=owner_bootstrap)
         fairness = AccountFairness()
