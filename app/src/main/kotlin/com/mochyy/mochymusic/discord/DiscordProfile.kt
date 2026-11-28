@@ -45,25 +45,15 @@ data class DiscordProfile(
             val user = json.parseToJsonElement(me.body).jsonObject
             val id = user.text("id") ?: error("Discord sent an account without an id")
             val username = user.text("username") ?: id
-            val extra = fetchExtras(id, token)
             return DiscordProfile(
                 id = id,
                 username = username,
                 displayName = user.text("global_name") ?: username,
                 avatarUrl = avatarUrl(id, user.text("avatar")),
-                bannerUrl = (extra?.text("banner") ?: user.text("banner"))?.let { "$Cdn/banners/$id/$it.png?size=600" },
-                bannerColor = extra?.color() ?: user.number("accent_color"),
-                pronouns = extra?.text("pronouns"),
-                bio = extra?.text("bio") ?: user.text("bio"),
+                bannerUrl = user.text("banner")?.let { "$Cdn/banners/$id/$it.png?size=512" },
+                bannerColor = user.number("accent_color"),
             )
         }
-
-        /** the profile part (bio, pronouns, banner): best effort, since Discord may say no */
-        private suspend fun fetchExtras(id: String, token: String): JsonObject? = runCatching {
-            val reply = DiscordHttp.get("/users/$id/profile", token)
-            if (!reply.ok) return@runCatching null
-            json.parseToJsonElement(reply.body).jsonObject["user_profile"]?.jsonObject
-        }.getOrNull()
 
         /** Discord's picture, or the coloured default it gives accounts without one */
         private fun avatarUrl(id: String, hash: String?): String {
